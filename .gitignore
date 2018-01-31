@@ -1,3 +1,7 @@
+# User specific environment
+.env
+# Entire build directory
+bin
 # Prerequisites
 *.d
 
