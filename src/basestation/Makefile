@@ -3,11 +3,12 @@
 #ARDMK_DIR = <path to arduino makefile>
 #ARDUINO_DIR = <path to arduino installation>
 
-include .env
-BOARD_TAG = mega
+include ../.env
+BOARD_TAG = mega2560
 BOARD_SUB = atmega2560
-USER_LIB_PATH = ../lib
-OBJDIR = ../bin
-TARGET = ROOMBA
+USER_LIB_PATH = ../../lib
+OBJDIR = ../../bin
+TARGET = base
+MONITOR_PORT = /dev/ttyACM0
 
 include $(ARDMK_DIR)/Arduino.mk
