@@ -24,76 +24,124 @@
  * See scheduler.h for more documentation on the scheduler functions.  It's worth your time to look over scheduler.cpp
  * too, it's not difficult to understand what's going on here.
  */
+#define DEADZONE 20
 
-#include "arduino/Arduino.h"
+#include <Arduino.h>
 #include "scheduler.h"
+
+#define sign(x) ((x > 0) - (x < 0))
+
+#define FORWARD 'f'
+#define REVERSE 'b'
+#define STOP 's'
+#define LEFT 'l'
+#define RIGHT 'r'
+#define DOCK 'd'
+#define POWER 'p'
 
 uint8_t pulse1_pin = 3;
 uint8_t pulse2_pin = 4;
 uint8_t idle_pin = 7;
 
-// task function for PulsePin task
-void pulse_pin1_task()
-{
-	digitalWrite(pulse1_pin, HIGH);
+// Forwards is towards the wires which is x = 0, back is x = 1023, left is y=1023, right is y=0.
+uint8_t  joy_b_pin = 5;
+uint8_t  joy_x_pin = A1;
+uint8_t  joy_y_pin = A0;
+int16_t joy_x     = 0;
+int16_t joy_y     = 0;
+uint8_t  joy_b     = 0;
 
-	digitalWrite(pulse1_pin, LOW);
+
+// task function for PulsePin task
+void sample_joy_task()
+{
+  joy_b = !digitalRead(joy_b_pin);
+  joy_x = map(analogRead(joy_x_pin),0,1023,90,-90);
+  joy_y = map(analogRead(joy_y_pin),0,1023,90,-90);
+  if (abs(joy_x) >= abs(joy_y)) {
+    joy_y = 0;
+  } else {
+    joy_x = 0;
+  }
+  if (abs(joy_x) < DEADZONE) {
+    joy_x = 0;
+  }
+  if (abs(joy_y) < DEADZONE) {
+    joy_y = 0;
+  }
+  joy_x = sign(joy_x);
+  joy_y = sign(joy_y);
+
 }
 
 // task function for PulsePin task
-void pulse_pin2_task()
+void send_command_task()
 {
-	digitalWrite(pulse2_pin, HIGH);
-
-	digitalWrite(pulse2_pin, LOW);
+  char command;
+  if( joy_b ){
+    command = DOCK;
+  }else if ( joy_x == 1 ){
+    command = FORWARD;
+  }else if ( joy_x == -1 ){
+    command = REVERSE;
+  }else if ( joy_y == 1 ){
+    command = RIGHT;
+  }else if ( joy_y == -1 ) {
+    command = LEFT;
+  }else {
+    command = STOP;
+  }
+  Serial.write(command);
+  //Serial1.write(command); //testing the nano
 }
 
 // idle task
 void idle(uint32_t idle_period)
 {
-	// this function can perform some low-priority task while the scheduler has nothing to run.
-	// It should return before the idle period (measured in ms) has expired.  For example, it
-	// could sleep or respond to I/O.
+  // this function can perform some low-priority task while the scheduler has nothing to run.
+  // It should return before the idle period (measured in ms) has expired.  For example, it
+  // could sleep or respond to I/O.
 
-	// example idle function that just pulses a pin.
-	digitalWrite(idle_pin, HIGH);
-	delay(idle_period);
-	digitalWrite(idle_pin, LOW);
+  // example idle function that just pulses a pin.
+  digitalWrite(idle_pin, HIGH);
+  delay(idle_period);
+  digitalWrite(idle_pin, LOW);
 }
 
 void setup()
 {
-	pinMode(pulse1_pin, OUTPUT);
-	pinMode(pulse2_pin, OUTPUT);
-	pinMode(idle_pin, OUTPUT);
+  pinMode(joy_b_pin, INPUT_PULLUP);
+  pinMode(idle_pin, OUTPUT);
+  Serial.begin(9600);
+  //Serial1.begin(9600); //testing the nano
 
-	Scheduler_Init();
+  Scheduler_Init();
 
-	// Start task arguments are:
-	//		start offset in ms, period in ms, function callback
+  // Start task arguments are:
+  //		start offset in ms, period in ms, function callback
 
-	Scheduler_StartTask(0, 500, pulse_pin1_task);
-	Scheduler_StartTask(0, 300, pulse_pin2_task);
+  Scheduler_StartTask(50, 100, sample_joy_task);
+  Scheduler_StartTask(0, 300, send_command_task);
 }
 
 void loop()
 {
-	uint32_t idle_period = Scheduler_Dispatch();
-	if (idle_period)
-	{
-		idle(idle_period);
-	}
+  uint32_t idle_period = Scheduler_Dispatch();
+  if (idle_period)
+  {
+    idle(idle_period);
+  }
 }
 
 int main()
 {
-	init();
-	setup();
+  init();
+  setup();
 
-	for (;;)
-	{
-		loop();
-	}
-	for (;;);
-	return 0;
+  for (;;)
+  {
+    loop();
+  }
+  for (;;);
+  return 0;
 }

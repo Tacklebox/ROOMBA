@@ -4,8 +4,8 @@
 #ARDUINO_DIR = <path to arduino installation>
 
 include .env
-BOARD_TAG = mega
-BOARD_SUB = atmega2560
+BOARD_TAG = nano
+BOARD_SUB = atmega328
 USER_LIB_PATH = ../lib
 OBJDIR = ../bin
 TARGET = ROOMBA
