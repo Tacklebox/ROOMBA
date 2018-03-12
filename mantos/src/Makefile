@@ -8,6 +8,6 @@ BOARD_TAG = mega
 BOARD_SUB = atmega2560
 USER_LIB_PATH = ../lib
 OBJDIR = ../bin
-TARGET = exercise
+TARGET = mantos
 
 include $(ARDMK_DIR)/Arduino.mk

@@ -3,31 +3,6 @@
 #include <avr/io.h>
 #include <string.h>
 #include <util/delay.h>
-/**
- * \file active.c
- * \brief A Skeleton Implementation of an RTOS
- *
- * \mainpage A Skeleton Implementation of a "Full-Served" RTOS Model
- * This is an example of how to implement context-switching based on a
- * full-served model. That is, the RTOS is implemented by an independent
- * "kernel" task, which has its own stack and calls the appropriate kernel
- * function on behalf of the user task.
- *
- * \author Dr. Mantis Cheng
- * \date 29 September 2006
- *
- * ChangeLog: Modified by Alexander M. Hoole, October 2006.
- *              -Rectified errors and enabled context switching.
- *              -LED Testing code added for development (remove later).
- *
- * \section Implementation Note
- * This example uses the ATMEL AT90USB1287 instruction set as an example
- * for implementing the context switching mechanism.
- * This code is ready to be loaded onto an AT90USBKey.  Once loaded the
- * RTOS scheduling code will alternate lighting of the GREEN LED light on
- * LED D2 and D5 whenever the correspoing PING and PONG tasks are running.
- * (See the file "cswitch.S" for details.)
- */
 
 typedef void (*voidfuncptr)(void); /* pointer to void f(void) */
 
@@ -114,6 +89,16 @@ static PD Process[MAXPROCESS];
  * The process descriptor of the currently RUNNING task.
  */
 volatile static PD *Cp;
+
+ISR(BADISR_vect){
+  enable_LED(_BV(PORTB7));
+  _delay_ms(5000);
+  disable_LEDs();
+  _delay_ms(400);
+  enable_LED(_BV(PORTB7));
+  _delay_ms(5000);
+  disable_LEDs();
+}
 
 /**
  * Since this is a "full-served" model, the kernel is executing using its own
@@ -389,8 +374,8 @@ void Pong() {
 void enable_INT4() {
   DDRE &= ~_BV(DDE4);
   PORTE |= _BV(DDE4);
-  EICRB = _BV(ISC41);
-  EIMSK = _BV(INT4);
+  EICRB |= _BV(ISC41);
+  EIMSK |= _BV(INT4);
 }
 
 /**
@@ -398,8 +383,10 @@ void enable_INT4() {
  * will run forever.
  */
 int main() {
+  init_LED_D13();
   enable_INT4();
   init_LED_D12();
+  disable_LEDs();
   OS_Init();
   Task_Create(Pong);
   Task_Create(Ping);
