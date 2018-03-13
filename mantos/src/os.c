@@ -15,6 +15,48 @@ typedef void (*voidfuncptr)(void); /* pointer to void f(void) */
  *===========
  */
 
+
+ISR(BADISR_vect){
+  enable_LED(_BV(PORTB7));
+  _delay_ms(800);
+  disable_LEDs();
+  _delay_ms(400);
+  enable_LED(_BV(PORTB7));
+  _delay_ms(800);
+  disable_LEDs();
+  _delay_ms(400);
+  enable_LED(_BV(PORTB7));
+  _delay_ms(800);
+  disable_LEDs();
+  _delay_ms(400);
+
+  enable_LED(_BV(PORTB7));
+  _delay_ms(400);
+  disable_LEDs();
+  _delay_ms(400);
+  enable_LED(_BV(PORTB7));
+  _delay_ms(400);
+  disable_LEDs();
+  _delay_ms(400);
+  enable_LED(_BV(PORTB7));
+  _delay_ms(400);
+  disable_LEDs();
+  _delay_ms(400);
+
+  enable_LED(_BV(PORTB7));
+  _delay_ms(800);
+  disable_LEDs();
+  _delay_ms(400);
+  enable_LED(_BV(PORTB7));
+  _delay_ms(800);
+  disable_LEDs();
+  _delay_ms(400);
+  enable_LED(_BV(PORTB7));
+  _delay_ms(800);
+  disable_LEDs();
+  _delay_ms(400);
+}
+
 /**
  * This internal kernel function is the context switching mechanism.
  * It is done in a "funny" way in that it consists two halves: the top half
@@ -90,15 +132,6 @@ static PD Process[MAXPROCESS];
  */
 volatile static PD *Cp;
 
-ISR(BADISR_vect){
-  enable_LED(_BV(PORTB7));
-  _delay_ms(5000);
-  disable_LEDs();
-  _delay_ms(400);
-  enable_LED(_BV(PORTB7));
-  _delay_ms(5000);
-  disable_LEDs();
-}
 
 /**
  * Since this is a "full-served" model, the kernel is executing using its own
@@ -352,7 +385,6 @@ void Ping() {
     disable_LEDs();
     enable_LED(_BV(PORTB4));
     _delay_ms(LED_BLINK_DURATION);
-    Task_Next();
   }
 }
 
@@ -366,8 +398,6 @@ void Pong() {
     disable_LEDs();
     enable_LED(_BV(PORTB5));
     _delay_ms(LED_BLINK_DURATION);
-
-    Task_Next();
   }
 }
 
@@ -384,8 +414,8 @@ void enable_INT4() {
  */
 int main() {
   init_LED_D13();
-  enable_INT4();
   init_LED_D12();
+  enable_INT4();
   disable_LEDs();
   OS_Init();
   Task_Create(Pong);
@@ -394,11 +424,6 @@ int main() {
 }
 
 ISR(INT4_vect) {
-  if (KernelActive) {
-    enable_LED(_BV(PORTB6));
-    _delay_ms(LED_BLINK_DURATION / 10);
-    disable_LEDs();
-    Cp->request = NEXT;
-    asm volatile("jmp Enter_Kernel");
-  }
+  Cp->request = NEXT;
+  asm volatile("jmp Enter_Kernel");
 }
