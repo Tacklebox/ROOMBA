@@ -17,43 +17,43 @@ typedef void (*voidfuncptr)(void); /* pointer to void f(void) */
 
 
 ISR(BADISR_vect){
-  enable_LED(_BV(PORTB7));
+  PORTB = _BV(PORTB7);
   _delay_ms(800);
-  disable_LEDs();
+  PORTB = 0;
   _delay_ms(400);
-  enable_LED(_BV(PORTB7));
+  PORTB = _BV(PORTB7);
   _delay_ms(800);
-  disable_LEDs();
+  PORTB = 0;
   _delay_ms(400);
-  enable_LED(_BV(PORTB7));
+  PORTB = _BV(PORTB7);
   _delay_ms(800);
-  disable_LEDs();
+  PORTB = 0;
   _delay_ms(400);
 
-  enable_LED(_BV(PORTB7));
+  PORTB = _BV(PORTB7);
   _delay_ms(400);
-  disable_LEDs();
+  PORTB = 0;
   _delay_ms(400);
-  enable_LED(_BV(PORTB7));
+  PORTB = _BV(PORTB7);
   _delay_ms(400);
-  disable_LEDs();
+  PORTB = 0;
   _delay_ms(400);
-  enable_LED(_BV(PORTB7));
+  PORTB = _BV(PORTB7);
   _delay_ms(400);
-  disable_LEDs();
+  PORTB = 0;
   _delay_ms(400);
 
-  enable_LED(_BV(PORTB7));
+  PORTB = _BV(PORTB7);
   _delay_ms(800);
-  disable_LEDs();
+  PORTB = 0;
   _delay_ms(400);
-  enable_LED(_BV(PORTB7));
+  PORTB = _BV(PORTB7);
   _delay_ms(800);
-  disable_LEDs();
+  PORTB = 0;
   _delay_ms(400);
-  enable_LED(_BV(PORTB7));
+  PORTB = _BV(PORTB7);
   _delay_ms(800);
-  disable_LEDs();
+  PORTB = 0;
   _delay_ms(400);
 }
 
@@ -382,8 +382,8 @@ void Task_Terminate() {
 void Ping() {
   init_LED_D10();
   for (;;) {
-    disable_LEDs();
-    enable_LED(_BV(PORTB4));
+    PORTB = 0;
+    PORTB = _BV(PORTB4);
     _delay_ms(LED_BLINK_DURATION);
   }
 }
@@ -395,8 +395,8 @@ void Ping() {
 void Pong() {
   init_LED_D11();
   for (;;) {
-    disable_LEDs();
-    enable_LED(_BV(PORTB5));
+    DDRB = 0;
+    PORTB = _BV(PORTB5);
     _delay_ms(LED_BLINK_DURATION);
   }
 }
@@ -408,6 +408,16 @@ void enable_INT4() {
   EIMSK |= _BV(INT4);
 }
 
+void enable_TIMER4() {
+  TCCR4A = 0;
+  TCCR4B = 0;
+  TCCR4B |= _BV(WGM42);
+  TCCR4B |= _BV(CS42);
+  OCR4A = 62500;
+  TIMSK4 |= _BV(OCIE4A);
+  TCNT4 = 0;
+}
+
 /**
  * This function creates two cooperative tasks, "Ping" and "Pong". Both
  * will run forever.
@@ -415,8 +425,8 @@ void enable_INT4() {
 int main() {
   init_LED_D13();
   init_LED_D12();
-  enable_INT4();
-  disable_LEDs();
+  //enable_INT4();
+  enable_TIMER4();
   OS_Init();
   Task_Create(Pong);
   Task_Create(Ping);
@@ -424,6 +434,11 @@ int main() {
 }
 
 ISR(INT4_vect) {
+  Cp->request = NEXT;
+  asm volatile("jmp Enter_Kernel");
+}
+
+ISR(TIMER4_COMPA_vect) {
   Cp->request = NEXT;
   asm volatile("jmp Enter_Kernel");
 }
