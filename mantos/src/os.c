@@ -425,7 +425,7 @@ void enable_TIMER4() {
 int main() {
   init_LED_D13();
   init_LED_D12();
-  //enable_INT4();
+  enable_INT4();
   enable_TIMER4();
   OS_Init();
   Task_Create(Pong);
