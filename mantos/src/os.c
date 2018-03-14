@@ -335,7 +335,7 @@ void OS_Start() {
  * each task gives up its share of the processor voluntarily by calling
  * Task_Next().
  */
-void Task_Create(voidfuncptr f) {
+void Task_Create(  f) {
   if (KernelActive) {
     Disable_Interrupt();
     Cp->request = CREATE;
@@ -442,3 +442,4 @@ ISR(TIMER4_COMPA_vect) {
   Cp->request = NEXT;
   asm volatile("jmp Enter_Kernel");
 }
+ 
