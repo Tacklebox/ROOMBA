@@ -37,6 +37,7 @@ typedef struct task_type {
 	process_state state;
 	kernel_request request;
 	task_priority priority;
+	int arg;
 	unsigned char* sp;
 	unsigned char workspace[WORKSPACE];
 } task;
@@ -78,7 +79,7 @@ void Task_Terminate() {
 }
 
 
-PID Kernel_Create_Task_At(task *p, voidfuncptr f, task_priority priority) {
+PID Kernel_Create_Task_At(task *p, voidfuncptr f, int arg, task_priority priority) {
   unsigned char *sp;
 
   // Changed -2 to -1 to fix off by one error.
@@ -115,6 +116,7 @@ PID Kernel_Create_Task_At(task *p, voidfuncptr f, task_priority priority) {
   p->request = NONE;
   p->pid = num_tasks;
   p->priority = priority;
+  p->arg = arg;
 
   /*----END of NEW CODE----*/
 
@@ -140,7 +142,7 @@ static void Dispatch() {
 }
 
 
-static PID Kernel_Create_Task(voidfuncptr f, task_priority priority) {
+static void Kernel_Create_Task(voidfuncptr f, int arg, task_priority priority) {
   int x;
 
   if (num_tasks == MAXTHREAD)
@@ -153,7 +155,7 @@ static PID Kernel_Create_Task(voidfuncptr f, task_priority priority) {
   }
 
   ++num_tasks;
-  return Kernel_Create_Task_At(&(tasks[x]), f, priority);
+  Kernel_Create_Task_At(&(tasks[x]), f, arg, priority);
 }
 
 
@@ -177,7 +179,7 @@ static void Next_Kernel_Request() {
 
     switch (cur_task->request) {
     case CREATE:
-      Kernel_Create_Task(cur_task->code, cur_task->priority);
+      Kernel_Create_Task(cur_task->code, cur_task->priority, cur_task->arg);
       break;
     case NEXT:
     case NONE:
@@ -204,10 +206,12 @@ PID Task_Create_RR(void (*f)(void), int arg) {
     	cur_task->request = CREATE;
     	cur_task->code = f;
     	cur_task->priority = LOWEST;
+    	cur_task->arg = arg;
+    	//TODO: PID?
     	Enter_Kernel();
 	} else {
 	    /* call the RTOS function directly */
-	    Kernel_Create_Task(f, LOWEST);
+	    Kernel_Create_Task(f, arg, LOWEST);
 	}
 }
 
@@ -226,16 +230,17 @@ void OS_Init() {
 
 
 void OS_Start() {
-  if ((!kernel_active) && (num_tasks > 0)) {
-    Disable_Interrupt();
-    /* we may have to initialize the interrupt vector for Enter_Kernel() here.
-     */
-
-    /* here we go...  */
-    kernel_active = 1;
-    Next_Kernel_Request();
-    /* NEVER RETURNS!!! */
-  }
+	enable_INT4();
+	enable_TIMER4();
+  	if ((!kernel_active) && (num_tasks > 0)) {
+    	Disable_Interrupt();
+    	/* we may have to initialize the interrupt vector for Enter_Kernel() here.
+     	*/
+	    /* here we go...  */
+	    kernel_active = 1;
+	    Next_Kernel_Request();
+	    /* NEVER RETURNS!!! */
+	  }
 }
 
 void enable_INT4() {
@@ -262,6 +267,7 @@ void Ping() {
     PORTB = 0;
     PORTB = _BV(PORTB4);
     _delay_ms(LED_BLINK_DURATION);
+    Task_Next();
   }
 }
 
@@ -271,14 +277,13 @@ void Pong() {
     DDRB = 0;
     PORTB = _BV(PORTB5);
     _delay_ms(LED_BLINK_DURATION);
+    Task_Next();
   }
 }
 
 //
 
 void main(){
-	enable_INT4();
-	enable_TIMER4();
 	OS_Init();
 	Task_Create_RR(Ping, 0);
 	Task_Create_RR(Pong, 0);

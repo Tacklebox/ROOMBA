@@ -165,7 +165,7 @@ volatile static unsigned int Tasks;
  * can just restore its execution context on its stack.
  * (See file "cswitch.S" for details.)
  */
-void Kernel_Create_Task_At(PD *p, voidfuncptr f) {
+void Kernel_Create_Task_At(PD *p, voidfuncptr f, int) {
   unsigned char *sp;
 
   // Changed -2 to -1 to fix off by one error.
