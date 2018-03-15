@@ -24,28 +24,28 @@ struct queue_data_t {
 };
 
 
-queue_element_t queue_peek(queue_t q){
+queue_element_t queue_peek(queue_t q) {
     return q->head->e;
 }
 
 queue_t queue_create() {
     queue_t q = (queue_t) malloc(sizeof(struct queue_data_t));
 
-    if(!q)
+    if (!q)
         return NULL;            // failed to allocate memory
 
     q->head = NULL;
     return q;
 }
 
-void queue_destroy(queue_t q){
-    if(q){
-        while(!queue_is_empty(q)){
+void queue_destroy(queue_t q) {
+    if (q) {
+        while (!queue_is_empty(q)) {
             queue_link_t oldHead = q->head;
             q->head = oldHead->next;
             free(oldHead);
         }
-        free(q);        
+        free(q);
     }
 
 }
@@ -55,7 +55,7 @@ void queue_destroy(queue_t q){
 static queue_link_t queue_new_element(queue_element_t e) {
     queue_link_t qlt = (queue_link_t) malloc(sizeof(struct queue_link_data_t));
 
-    if(!qlt)
+    if (!qlt)
         return NULL;            // failed to allocate memory
 
     qlt->e = e;
@@ -68,19 +68,19 @@ void queue_append(queue_t q, queue_element_t e) {
     queue_link_t cur;
 
     assert(q != NULL);
-    
-    if(queue_is_empty(q)){  // add first element to empty queue
-        q->head = queue_new_element(e);  
-        
-    }else{
+
+    if (queue_is_empty(q)) { // add first element to empty queue
+        q->head = queue_new_element(e);
+
+    } else {
         cur = q->head;
-        
+
         assert(q->head != NULL);
-        
-        while(cur->next) { 
+
+        while (cur->next) {
             cur = cur->next;
         }
-        
+
         cur->next = queue_new_element(e);
     }
 }
@@ -89,14 +89,14 @@ boolean_t queue_remove(queue_t q, queue_element_t * e) {
     queue_link_t oldHead;
 
     assert(q != NULL);
-    if(queue_is_empty(q))
+    if (queue_is_empty(q))
         return FALSE;
 
     *e = q->head->e;
     oldHead = q->head;
     q->head = q->head->next;
     free(oldHead);
-    
+
     return TRUE;
 }
 
@@ -105,79 +105,79 @@ boolean_t queue_is_empty(queue_t q) {
     return (q->head == NULL);
 }
 
-void queue_reverse(queue_t q){
-    if(!queue_is_empty(q)){
+void queue_reverse(queue_t q) {
+    if (!queue_is_empty(q)) {
         queue_element_t *e = malloc(sizeof(*e));
-        
-        queue_remove(q,e);
+
+        queue_remove(q, e);
         queue_reverse(q);
-        queue_append(q,*e);
+        queue_append(q, *e);
         free(e);
     }
 }
 
 
-void queue_merge(queue_t q, queue_t o, queue_t t, queue_pfcompare_t pf){
+void queue_merge(queue_t q, queue_t o, queue_t t, queue_pfcompare_t pf) {
     assert(q != NULL);
-    
-    while(!queue_is_empty(o) && !queue_is_empty(t)){
-        
-        if((*pf)(o->head->e,t->head->e) == -1){                       // eo < et
+
+    while (!queue_is_empty(o) && !queue_is_empty(t)) {
+
+        if ((*pf)(o->head->e, t->head->e) == -1) {                    // eo < et
             queue_element_t eo;
-        
+
             queue_remove(o, &eo);
             queue_append(q, eo);
-        }else{                                                      // eo == et or eo > et
-            queue_element_t et; 
-            
+        } else {                                                     // eo == et or eo > et
+            queue_element_t et;
+
             queue_remove(t, &et);
             queue_append(q, et);
         }
     }
-    
-    while(!queue_is_empty(o)){
+
+    while (!queue_is_empty(o)) {
         queue_element_t eo;
-        
-        queue_remove(o, &eo); 
+
+        queue_remove(o, &eo);
         queue_append(q, eo);
     }
-    
-    while(!queue_is_empty(t)){
+
+    while (!queue_is_empty(t)) {
         queue_element_t et;
-            
+
         queue_remove(t, &et);
         queue_append(q, et);
     }
-    
-    assert(queue_is_empty(o) && queue_is_empty(t));
-} 
 
-void queue_sort(queue_t q, queue_pfcompare_t pf){
+    assert(queue_is_empty(o) && queue_is_empty(t));
+}
+
+void queue_sort(queue_t q, queue_pfcompare_t pf) {
     assert(q != NULL);
 
-    if(!queue_is_empty(q) && q->head->next != NULL){ //if not empty and not 1 element 
-               
+    if (!queue_is_empty(q) && q->head->next != NULL) { //if not empty and not 1 element
+
         queue_element_t e;
         queue_t o = queue_create();
         queue_t t = queue_create();
         boolean_t b = FALSE;
-        
-        while(!queue_is_empty(q)){
+
+        while (!queue_is_empty(q)) {
             queue_remove(q, &e);
-        
-            if(b){
+
+            if (b) {
                 queue_append(o, e);
-            }else{
+            } else {
                 queue_append(t, e);
             }
-            
+
             b = !b;             //2 b | ! 2 b
         }
-        
+
         queue_sort(o, pf);
         queue_sort(t, pf);
         queue_merge(q, o, t, pf);
-        
+
         queue_destroy(o);
         queue_destroy(t);
     }
@@ -204,13 +204,13 @@ boolean_t queue_apply(queue_t q, queue_pfapply_t pf,
                       queue_pfapply_closure_t cl) {
     assert(q != NULL && pf != NULL);
 
-    if(queue_is_empty(q))
+    if (queue_is_empty(q))
         return FALSE;
 
     queue_link_t cur;
 
-    for(cur = q->head; cur; cur = cur->next) {
-        if(!pf(cur->e, cl))
+    for (cur = q->head; cur; cur = cur->next) {
+        if (!pf(cur->e, cl))
             break;
     }
 

@@ -26,7 +26,7 @@ extern queue_t queue_create();
  */
 extern void queue_append(queue_t q, queue_element_t e);
 
-/* 
+/*
  * Remove the first element from the queue and leaves result in e.
  * Returns false if isEmpty() prior to remove.
  */

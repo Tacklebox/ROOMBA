@@ -1,8 +1,8 @@
 /* Last modified: MHMC Jan/30/2018 */
-#ifndef _OS_H_  
-#define _OS_H_  
+#ifndef _OS_H_
+#define _OS_H_
 
-#define MAXTHREAD     16       
+#define MAXTHREAD     16
 #define WORKSPACE     256   // in bytes, per THREAD
 #define MSECPERTICK   10   // resolution of a system TICK in milliseconds
 
@@ -18,7 +18,7 @@ typedef unsigned int PID;        // always non-zero if it is valid
 typedef unsigned int TICK;       // 1 TICK is defined by MSECPERTICK
 typedef unsigned int BOOL;       // TRUE or FALSE
 typedef unsigned char MTYPE;
-typedef unsigned char MASK; 
+typedef unsigned char MASK;
 
 // Aborts the RTOS and enters a "non-executing" state with an error code. That is, all tasks
 // will be stopped.
@@ -42,29 +42,29 @@ void OS_Abort(unsigned int error);
  * System and RR tasks are first-come-first-served. They run until they terminate, block,
  * or yield. RR tasks, on the other hand, run until they expire their quantum, or are
  * pre-empted. If they are preempted, then reenter at the front of their level. If they
- * expire their quantum, then they go back to the end of their level. Currently, a quantum 
+ * expire their quantum, then they go back to the end of their level. Currently, a quantum
  * is defined to be 1 TICK.
  */
 
 PID   Task_Create_System(void (*f)(void), int arg);
 PID   Task_Create_RR(    void (*f)(void), int arg);
 
- /**
-   * f a parameterless function to be created as a process instance
-   * arg an integer argument to be assigned to this process instanace
-   * period its execution period in multiples of TICKs
-   * wcet its worst-case execution time in TICKs, must be less than "period"
-   * offset its start time in TICKs
-   * returns 0 if not successful; otherwise a non-zero PID.
-   */
+/**
+  * f a parameterless function to be created as a process instance
+  * arg an integer argument to be assigned to this process instanace
+  * period its execution period in multiples of TICKs
+  * wcet its worst-case execution time in TICKs, must be less than "period"
+  * offset its start time in TICKs
+  * returns 0 if not successful; otherwise a non-zero PID.
+  */
 PID   Task_Create_Period(void (*f)(void), int arg, TICK period, TICK wcet, TICK offset);
 
 // NOTE: When a task function returns, it terminates automatically!!
 
 // When a Periodic ask calls Task_Next(), it will resume at the beginning of its next period.
-// When a RR or System task calls Task_Next(), it voluntarily gives up execution and 
+// When a RR or System task calls Task_Next(), it voluntarily gives up execution and
 // re-enters the ready state. All RR and Systems tasks are first-come-first-served.
-//   
+//
 void Task_Next(void);
 
 
@@ -100,7 +100,7 @@ void Msg_ASend( PID  id, MTYPE t, unsigned int v );
 
 
 
-/**  
+/**
   * Returns the number of milliseconds since OS_Init(). Note that this number
   * wraps around after it overflows as an unsigned integer. The arithmetic
   * of 2's complement will take care of this wrap-around behaviour if you use
@@ -117,9 +117,9 @@ void Msg_ASend( PID  id, MTYPE t, unsigned int v );
 unsigned int Now();  // number of milliseconds since the RTOS boots.
 
 
-/*==================================================================  
- *        S T A N D A R D   I N L I N E    P R O C E D U R E S  
- *==================================================================  
+/*==================================================================
+ *        S T A N D A R D   I N L I N E    P R O C E D U R E S
+ *==================================================================
 /**
  * Booting:
  *  The RTOS and the main application are compiled into a single executable binary, but
