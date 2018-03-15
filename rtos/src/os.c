@@ -4,22 +4,23 @@
 #include <util/delay.h>
 
 
-#define LED_BLINK_DURATION 5000
+#define LED_BLINK_DURATION 500
+#define F_CPU 16000000UL
 
 typedef unsigned int PID;
 
 typedef enum task_priority_type {
-	HIGHEST = 0,
-	MEDIUM,
-	LOWEST
+    HIGHEST = 0,
+    MEDIUM,
+    LOWEST
 } task_priority;
 
 typedef enum process_state_type { 
-	DEAD = 0, 
-	READY, 
-	WAITING, 
-	SLEEPING, 
-	RUNNING 
+    DEAD = 0, 
+    READY, 
+    WAITING, 
+    SLEEPING, 
+    RUNNING 
 } process_state;
 
 typedef enum kernel_request_type {
@@ -32,14 +33,14 @@ typedef enum kernel_request_type {
 typedef void (*voidfuncptr)(void); 
 
 typedef struct task_type {
-	PID pid;
-	voidfuncptr code;
-	process_state state;
-	kernel_request request;
-	task_priority priority;
-	int arg;
-	unsigned char* sp;
-	unsigned char workspace[WORKSPACE];
+    PID pid;
+    voidfuncptr code;
+    process_state state;
+    kernel_request request;
+    task_priority priority;
+    int arg;
+    unsigned char* sp;
+    unsigned char workspace[WORKSPACE];
 } task;
 
 extern void CSwitch();
@@ -57,6 +58,8 @@ volatile static task* cur_task;
 volatile static unsigned int next_task_idx;
 volatile static unsigned int num_tasks;
 volatile static unsigned int kernel_active;
+volatile static PID last_pid;
+volatile static unsigned int cur_time;
 
 void Task_Next() {
   if (kernel_active) {
@@ -114,7 +117,7 @@ PID Kernel_Create_Task_At(task *p, voidfuncptr f, int arg, task_priority priorit
   p->sp = sp;  /* stack pointer into the "workSpace" */
   p->code = f; /* function to be executed as a task */
   p->request = NONE;
-  p->pid = num_tasks;
+  p->pid = ++last_pid;
   p->priority = priority;
   p->arg = arg;
 
@@ -201,101 +204,110 @@ static void Next_Kernel_Request() {
 
 
 PID Task_Create_RR(void (*f)(void), int arg) {
-	if (kernel_active) {
-    	Disable_Interrupt();
-    	cur_task->request = CREATE;
-    	cur_task->code = f;
-    	cur_task->priority = LOWEST;
-    	cur_task->arg = arg;
-    	//TODO: PID?
-    	Enter_Kernel();
-	} else {
-	    /* call the RTOS function directly */
-	    Kernel_Create_Task(f, arg, LOWEST);
-	}
+    if (kernel_active) {
+        Disable_Interrupt();
+        cur_task->request = CREATE;
+        cur_task->code = f;
+        cur_task->priority = LOWEST;
+        cur_task->arg = arg;
+      cur_task->pid = ++last_pid;      
+        Enter_Kernel();
+    } else {
+        /* call the RTOS function directly */
+        Kernel_Create_Task(f, arg, LOWEST);
+    }
 }
 
 
 void OS_Init() {
-  int x;
-  num_tasks = 0;
-  kernel_active = 0;
-  next_task_idx = 0;
-  // Reminder: Clear the memory for the task on creation.
-  for (x = 0; x < MAXTHREAD; x++) {
-    memset(&(tasks[x]), 0, sizeof(task));
-    tasks[x].state = DEAD;
-  }
+    int x;
+    num_tasks = 0;
+    kernel_active = 0;
+    next_task_idx = 0;
+    // Reminder: Clear the memory for the task on creation.
+    for (x = 0; x < MAXTHREAD; x++) {
+        memset(&(tasks[x]), 0, sizeof(task));
+        tasks[x].state = DEAD;
+    }
 }
 
 
 void OS_Start() {
-	enable_INT4();
-	enable_TIMER4();
-  	if ((!kernel_active) && (num_tasks > 0)) {
-    	Disable_Interrupt();
-    	/* we may have to initialize the interrupt vector for Enter_Kernel() here.
-     	*/
-	    /* here we go...  */
-	    kernel_active = 1;
-	    Next_Kernel_Request();
-	    /* NEVER RETURNS!!! */
-	  }
+    cur_time = 0;
+    if ((!kernel_active) && (num_tasks > 0)) {
+        Disable_Interrupt();
+        /* we may have to initialize the interrupt vector for Enter_Kernel() here.
+        */
+        /* here we go...  */
+        kernel_active = 1;
+        Next_Kernel_Request();
+        /* NEVER RETURNS!!! */
+      }
 }
 
-void enable_INT4() {
-  DDRE &= ~_BV(DDE4);
-  PORTE |= _BV(DDE4);
-  EICRB |= _BV(ISC41);
-  EIMSK |= _BV(INT4);
+unsigned int Now(){
+    return cur_time;
 }
+
 
 void enable_TIMER4() {
-  TCCR4A = 0;
-  TCCR4B = 0;
-  TCCR4B |= _BV(WGM42);
-  TCCR4B |= _BV(CS42);
-  OCR4A = 62500;
-  TIMSK4 |= _BV(OCIE4A);
-  TCNT4 = 0;
+    TCCR4A = 0;
+    TCCR4B = 0;
+    TCCR4B |= _BV(WGM42);
+    TCCR4B |= _BV(CS42);
+    OCR4A = 62500;
+    TIMSK4 |= _BV(OCIE4A);
+    TCNT4 = 0;
+}
+
+void enable_TIMER3() {
+    TCCR3A = 0;
+    TCCR3B = 0;
+    TCCR4B |= _BV(WGM32);
+    TCCR3B |= _BV(CS31);
+    OCR3A = ((F_CPU / 1000) / 8);
+    TIMSK3 |= _BV(OCIE3A);
+    TCNT3 = 0;
 }
 
 //  TEST
 void Ping() {
-  init_LED_D10();
   for (;;) {
-    PORTB = 0;
     PORTB = _BV(PORTB4);
     _delay_ms(LED_BLINK_DURATION);
+    PORTB ^= _BV(PORTB4);
     Task_Next();
   }
 }
 
 void Pong() {
-  init_LED_D11();
   for (;;) {
-    DDRB = 0;
     PORTB = _BV(PORTB5);
     _delay_ms(LED_BLINK_DURATION);
+    PORTB ^= _BV(PORTB5);
     Task_Next();
   }
 }
 
-//
-
 void main(){
-	OS_Init();
-	Task_Create_RR(Ping, 0);
-	Task_Create_RR(Pong, 0);
-	OS_Start();
-}
+    init_LED_D12();
+    init_LED_D11();
+    init_LED_D10();
 
-ISR(INT4_vect) {
-  cur_task->request = NEXT;
-  asm volatile("jmp Enter_Kernel");
+    enable_TIMER3();
+    enable_TIMER4();
+
+    OS_Init();
+    Task_Create_RR(Ping, 0);
+    Task_Create_RR(Pong, 0);
+    OS_Start();
 }
 
 ISR(TIMER4_COMPA_vect) {
-  cur_task->request = NEXT;
-  asm volatile("jmp Enter_Kernel");
+    cur_task->request = NEXT;
+    asm volatile("jmp Enter_Kernel");
+}
+
+ISR(TIMER3_COMPA_vect) {
+   cur_time++;
 }
