@@ -1,4 +1,5 @@
 #include "os.h"
+#include "queue.h"
 #include "LED_Test.h"
 #include <avr/interrupt.h>
 #include <util/delay.h>
@@ -6,8 +7,6 @@
 
 #define LED_BLINK_DURATION 500
 #define F_CPU 16000000UL
-
-typedef unsigned int PID;
 
 typedef enum task_priority_type {
     HIGHEST = 0,
@@ -41,6 +40,9 @@ typedef struct task_type {
     int arg;
     unsigned char* sp;
     unsigned char workspace[WORKSPACE];
+    TICK start_time;
+    TICK period;
+    TICK wcet; 
 } task;
 
 extern void CSwitch();
@@ -200,6 +202,11 @@ static void Next_Kernel_Request() {
       break;
     }
   }
+}
+
+
+PID Task_Create_Period(void (*f)(void), int arg, TICK period, TICK wcet, TICK offset){
+
 }
 
 
