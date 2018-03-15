@@ -56,8 +56,9 @@ volatile unsigned char *KernelSp;
 volatile unsigned char *CurrentSp;
 
 static task tasks[MAXTHREAD];
+static queue_t low_queue;
+
 volatile static task* cur_task;
-volatile static unsigned int next_task_idx;
 volatile static unsigned int num_tasks;
 volatile static unsigned int kernel_active;
 volatile static PID last_pid;
@@ -126,7 +127,6 @@ PID Kernel_Create_Task_At(task *p, voidfuncptr f, int arg, task_priority priorit
   /*----END of NEW CODE----*/
 
   p->state = READY;
-
   return p->pid;
 }
 
@@ -135,15 +135,18 @@ static void Dispatch() {
   /* find the next READY task
    * Note: if there is no READY task, then this will loop forever!.
    */
-  while (tasks[next_task_idx].state != READY) {
-    next_task_idx = (next_task_idx + 1) % MAXTHREAD;
-  }
-
-  cur_task = &(tasks[next_task_idx]);
-  CurrentSp = cur_task->sp;
-  cur_task->state = RUNNING;
-
-  next_task_idx = (next_task_idx + 1) % MAXTHREAD;
+    task* cand_task = NULL;
+    while(cand_task == NULL || cand_task->state != READY){
+        if(cand_task != NULL){
+            queue_append(low_queue, cand_task);
+        }
+        if(!queue_is_empty(low_queue)){
+            queue_remove(low_queue, &cand_task);
+        }
+    }
+    cur_task = cand_task;
+    CurrentSp = cur_task->sp;
+    cur_task->state = RUNNING;
 }
 
 
@@ -157,6 +160,12 @@ static void Kernel_Create_Task(voidfuncptr f, int arg, task_priority priority) {
   for (x = 0; x < MAXTHREAD; x++) {
     if (tasks[x].state == DEAD)
       break;
+  }
+
+  if(priority == LOWEST){
+    queue_append(low_queue, &(tasks[x]));
+  }else{
+    // TODO: Error
   }
 
   ++num_tasks;
@@ -190,11 +199,13 @@ static void Next_Kernel_Request() {
     case NONE:
       /* NONE could be caused by a timer interrupt */
       cur_task->state = READY;
+      queue_append(low_queue, cur_task);
       Dispatch();
       break;
     case TERMINATE:
       /* deallocate all resources used by this task */
       cur_task->state = DEAD;
+      --num_tasks;
       Dispatch();
       break;
     default:
@@ -217,7 +228,7 @@ PID Task_Create_RR(void (*f)(void), int arg) {
         cur_task->code = f;
         cur_task->priority = LOWEST;
         cur_task->arg = arg;
-      cur_task->pid = ++last_pid;      
+        cur_task->pid = ++last_pid;      
         Enter_Kernel();
     } else {
         /* call the RTOS function directly */
@@ -230,7 +241,8 @@ void OS_Init() {
     int x;
     num_tasks = 0;
     kernel_active = 0;
-    next_task_idx = 0;
+    low_queue = queue_create();
+
     // Reminder: Clear the memory for the task on creation.
     for (x = 0; x < MAXTHREAD; x++) {
         memset(&(tasks[x]), 0, sizeof(task));
@@ -258,6 +270,7 @@ unsigned int Now(){
 
 
 void enable_TIMER4() {
+    // Enter kernel tick interrupt
     TCCR4A = 0;
     TCCR4B = 0;
     TCCR4B |= _BV(WGM42);
@@ -268,6 +281,7 @@ void enable_TIMER4() {
 }
 
 void enable_TIMER3() {
+    // Current time interrupt
     TCCR3A = 0;
     TCCR3B = 0;
     TCCR4B |= _BV(WGM32);
@@ -302,7 +316,7 @@ void main(){
     init_LED_D10();
 
     enable_TIMER3();
-    enable_TIMER4();
+    //enable_TIMER4();
 
     OS_Init();
     Task_Create_RR(Ping, 0);

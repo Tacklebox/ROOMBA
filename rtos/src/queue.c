@@ -23,6 +23,11 @@ struct queue_data_t {
     queue_link_t head;
 };
 
+
+queue_element_t queue_peek(queue_t q){
+    return q->head->e;
+}
+
 queue_t queue_create() {
     queue_t q = (queue_t) malloc(sizeof(struct queue_data_t));
 

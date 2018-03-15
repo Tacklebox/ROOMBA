@@ -12,6 +12,9 @@ typedef struct queue_data_t *queue_t;
 typedef void *queue_element_t;
 typedef int boolean_t;
 
+
+extern queue_element_t queue_peek(queue_t q);
+
 /*
  * Creates and returns a new queue.
  * Returns null on failure, else a valid queue.
