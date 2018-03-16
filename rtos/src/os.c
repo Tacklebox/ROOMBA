@@ -7,7 +7,6 @@
 
 
 #define LED_BLINK_DURATION 500
-#define F_CPU 16000000UL
 
 typedef enum task_priority_type {
     HIGHEST = 0,
@@ -57,6 +56,7 @@ volatile unsigned char *KernelSp;
 volatile unsigned char *CurrentSp;
 
 static task tasks[MAXTHREAD];
+static queue_t high_queue;
 static queue_t low_queue;
 
 volatile static task* cur_task;
@@ -124,15 +124,14 @@ PID Kernel_Create_Task_At(task *p, voidfuncptr f, int arg, task_priority priorit
     p->pid = ++last_pid;
     p->priority = priority;
     p->arg = arg;
-
-    /*----END of NEW CODE----*/
-
     p->state = READY;
     return p->pid;
 }
 
 void Push_Task(task* t) {
-    if (t->priority == LOWEST) {
+    if (t-> priority == HIGHEST) {
+        queue_append(high_queue, t);
+    } else if (t->priority == LOWEST) {
         queue_append(low_queue, t);
     } else {
         throw_error(PUSH_TASK_ERROR);
@@ -145,17 +144,14 @@ static void Dispatch() {
      * Note: if there is no READY task, then this will loop forever!.
      */
     task* cand_task = NULL;
-    while (cand_task == NULL || cand_task->state != READY) {
-        if (cand_task != NULL) {
-            queue_append(low_queue, cand_task);
-        }
-        if (!queue_is_empty(low_queue)) {
+    while (cand_task == NULL) {
+        if (!queue_is_empty(high_queue)) {
+            queue_remove(high_queue, &cand_task);
+        } else if (!queue_is_empty(low_queue)) {
             queue_remove(low_queue, &cand_task);
         }
     }
     cur_task = cand_task;
-    CurrentSp = cur_task->sp;
-    cur_task->state = RUNNING;
 }
 
 
@@ -182,6 +178,7 @@ static void Next_Kernel_Request() {
 
     while (1) {
         cur_task->request = NONE; /* clear its request */
+        cur_task->state = RUNNING;
 
         /* activate this newly selected task */
         CurrentSp = cur_task->sp;
@@ -202,9 +199,12 @@ static void Next_Kernel_Request() {
         case NEXT:
         case NONE:
             /* NONE could be caused by a timer interrupt */
-            cur_task->state = READY;
-            Push_Task(cur_task);
-            Dispatch();
+            if (cur_task->priority != HIGHEST) { // HIGHEST non interruptible maybe move to Dispatch?
+                cur_task->state = READY;
+                cur_task->sp = CurrentSp;
+                Push_Task(cur_task);
+                Dispatch();
+            }
             break;
         case TERMINATE:
             /* deallocate all resources used by this task */
@@ -214,8 +214,22 @@ static void Next_Kernel_Request() {
             break;
         default:
             /* Houston! we have a problem here! */
+            throw_error(KERNEL_REQUEST_ERROR);
             break;
         }
+    }
+}
+
+PID Task_Create_System(void (*f)(void), int arg) {
+    if (kernel_active) {
+        Disable_Interrupt();
+        cur_task->request = CREATE;
+        cur_task->code = f;
+        cur_task->priority = HIGHEST;
+        cur_task->arg = arg;
+        cur_task->pid = ++last_pid;
+    } else {
+        Kernel_Create_Task(f, arg, HIGHEST);
     }
 }
 
@@ -246,7 +260,7 @@ void OS_Init() {
     num_tasks = 0;
     kernel_active = 0;
     low_queue = queue_create();
-
+    high_queue = queue_create();
     // Reminder: Clear the memory for the task on creation.
     for (x = 0; x < MAXTHREAD; x++) {
         memset(&(tasks[x]), 0, sizeof(task));
@@ -273,24 +287,13 @@ unsigned int Now() {
 }
 
 
-void enable_TIMER4() {
-    // Enter kernel tick interrupt
-    TCCR4A = 0;
-    TCCR4B = 0;
-    TCCR4B |= _BV(WGM42);
-    TCCR4B |= _BV(CS42);
-    OCR4A = 62500;
-    TIMSK4 |= _BV(OCIE4A);
-    TCNT4 = 0;
-}
-
 void enable_TIMER3() {
     // Current time interrupt
     TCCR3A = 0;
     TCCR3B = 0;
     TCCR4B |= _BV(WGM32);
     TCCR3B |= _BV(CS31);
-    OCR3A = ((F_CPU / 1000) / 8);
+    OCR3A = ((F_CPU / 1000) / 8) * 10; //Fix timing later
     TIMSK3 |= _BV(OCIE3A);
     TCNT3 = 0;
 }
@@ -298,21 +301,42 @@ void enable_TIMER3() {
 //  TEST
 void Ping() {
     for (;;) {
-        PORTB = _BV(PORTB4);
+        PORTB |= _BV(PORTB4);
         _delay_ms(LED_BLINK_DURATION);
-        PORTB ^= _BV(PORTB4);
-        Task_Next();
+        PORTB &= ~_BV(PORTB4);
+        _delay_ms(500);
     }
 }
 
 void Pong() {
     for (;;) {
-        PORTB = _BV(PORTB5);
+        PORTB |= _BV(PORTB5);
         _delay_ms(LED_BLINK_DURATION);
-        PORTB ^= _BV(PORTB5);
-        Task_Next();
+        PORTB &= ~_BV(PORTB5);
+        _delay_ms(500);
     }
 }
+
+void HighOne() {
+    int i;
+    for (i = 0; i < 5; i++) {
+        PORTB = _BV(PORTB5);
+        _delay_ms(50);
+        PORTB ^= _BV(PORTB5);
+        _delay_ms(500);
+    }
+}
+
+void HighTwo() {
+    int i;
+    for (i = 0; i < 5; i++) {
+        PORTB = _BV(PORTB4);
+        _delay_ms(50);
+        PORTB ^= _BV(PORTB4);
+        _delay_ms(500);
+    }
+}
+
 
 void main() {
     init_LED_D12();
@@ -320,19 +344,23 @@ void main() {
     init_LED_D10();
 
     enable_TIMER3();
-    //enable_TIMER4();
 
     OS_Init();
     Task_Create_RR(Ping, 0);
     Task_Create_RR(Pong, 0);
+    Task_Create_System(HighOne, 0);
+    Task_Create_System(HighTwo, 0);
     OS_Start();
 }
 
-ISR(TIMER4_COMPA_vect) {
-    cur_task->request = NEXT;
-    asm volatile("jmp Enter_Kernel");
-}
 
 ISR(TIMER3_COMPA_vect) {
     cur_time++;
+    PORTB ^= _BV(PORTB6);
+    if (cur_time % MSECPERTICK == 0) {
+        if (kernel_active) {
+            cur_task->request = NEXT;
+            Enter_Kernel();
+        }
+    }
 }
