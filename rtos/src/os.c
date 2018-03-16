@@ -40,8 +40,8 @@ typedef struct task_type {
     int arg;
     unsigned char* sp;
     unsigned char workspace[WORKSPACE];
-    TICK start_time;
     TICK period;
+    TICK offset;
     TICK wcet;
 } task;
 
@@ -86,7 +86,7 @@ void Task_Terminate() {
 }
 
 
-PID Kernel_Create_Task_At(task *p, voidfuncptr f, int arg, task_priority priority) {
+PID Kernel_Create_Task_At(task *p, voidfuncptr f, int arg, task_priority priority, TICK period, TICK wcet, TICK offset) {
     unsigned char *sp;
 
     // Changed -2 to -1 to fix off by one error.
@@ -155,11 +155,13 @@ static void Dispatch() {
 }
 
 
-static void Kernel_Create_Task(voidfuncptr f, int arg, task_priority priority) {
+static PID Kernel_Create_Task(voidfuncptr f, int arg, task_priority priority, TICK period, TICK wcet, TICK offset) {
     int x;
 
-    if (num_tasks == MAXTHREAD)
+    if (num_tasks == MAXTHREAD){
+        throw_error(EXCEED_MAXTHREAD_ERROR);
         return; /* Too many task! */
+    }
 
     /* find a DEAD PD that we can use  */
     for (x = 0; x < MAXTHREAD; x++) {
@@ -168,8 +170,9 @@ static void Kernel_Create_Task(voidfuncptr f, int arg, task_priority priority) {
     }
 
     ++num_tasks;
-    Kernel_Create_Task_At(&(tasks[x]), f, arg, priority);
+    PID pid = Kernel_Create_Task_At(&(tasks[x]), f, arg, priority, period, wcet, offset);
     Push_Task(&(tasks[x]));
+    return pid;
 }
 
 
@@ -194,7 +197,7 @@ static void Next_Kernel_Request() {
 
         switch (cur_task->request) {
         case CREATE:
-            Kernel_Create_Task(cur_task->code, cur_task->priority, cur_task->arg);
+            Kernel_Create_Task(cur_task->code, cur_task->arg, cur_task->priority, cur_task->period, cur_task->wcet, cur_task->offset);
             break;
         case NEXT:
         case NONE:
@@ -221,37 +224,17 @@ static void Next_Kernel_Request() {
 }
 
 PID Task_Create_System(void (*f)(void), int arg) {
-    if (kernel_active) {
-        Disable_Interrupt();
-        cur_task->request = CREATE;
-        cur_task->code = f;
-        cur_task->priority = HIGHEST;
-        cur_task->arg = arg;
-        cur_task->pid = ++last_pid;
-    } else {
-        Kernel_Create_Task(f, arg, HIGHEST);
-    }
+    return Kernel_Create_Task(f, arg, HIGHEST, 0, 0, 0);
 }
 
 
 PID Task_Create_Period(void (*f)(void), int arg, TICK period, TICK wcet, TICK offset) {
-
+    return Kernel_Create_Task(f, arg, MEDIUM, period, wcet, offset);
 }
 
 
 PID Task_Create_RR(void (*f)(void), int arg) {
-    if (kernel_active) {
-        Disable_Interrupt();
-        cur_task->request = CREATE;
-        cur_task->code = f;
-        cur_task->priority = LOWEST;
-        cur_task->arg = arg;
-        cur_task->pid = ++last_pid;
-        Enter_Kernel();
-    } else {
-        /* call the RTOS function directly */
-        Kernel_Create_Task(f, arg, LOWEST);
-    }
+    return  Kernel_Create_Task(f, arg, LOWEST, 0, 0, 0);
 }
 
 
@@ -298,24 +281,7 @@ void enable_TIMER3() {
     TCNT3 = 0;
 }
 
-//  TEST
-void Ping() {
-    for (;;) {
-        PORTB |= _BV(PORTB4);
-        _delay_ms(LED_BLINK_DURATION);
-        PORTB &= ~_BV(PORTB4);
-        _delay_ms(500);
-    }
-}
 
-void Pong() {
-    for (;;) {
-        PORTB |= _BV(PORTB5);
-        _delay_ms(LED_BLINK_DURATION);
-        PORTB &= ~_BV(PORTB5);
-        _delay_ms(500);
-    }
-}
 
 void HighOne() {
     int i;
@@ -337,6 +303,25 @@ void HighTwo() {
     }
 }
 
+//  TEST
+void Ping() {
+    for (;;) {
+        PORTB |= _BV(PORTB4);
+        _delay_ms(LED_BLINK_DURATION);
+        PORTB &= ~_BV(PORTB4);
+        _delay_ms(500);
+        Task_Create_System(HighTwo, 0);
+    }
+}
+
+void Pong() {
+    for (;;) {
+        PORTB |= _BV(PORTB5);
+        _delay_ms(LED_BLINK_DURATION);
+        PORTB &= ~_BV(PORTB5);
+        _delay_ms(500);
+    }
+}
 
 void main() {
     init_LED_D12();
