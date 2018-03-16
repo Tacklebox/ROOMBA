@@ -1,5 +1,7 @@
 # User specific environment
 .env
+# CTags
+tags
 # Entire build directory
 bin
 # Prerequisites
