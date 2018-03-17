@@ -52,6 +52,8 @@ extern void Exit_Kernel();
 #define Disable_Interrupt() asm volatile("cli" ::)
 #define Enable_Interrupt() asm volatile("sei" ::)
 
+volatile register int *ms asm("r20");
+
 volatile unsigned char *KernelSp;
 volatile unsigned char *CurrentSp;
 
@@ -180,6 +182,7 @@ static void Next_Kernel_Request() {
     Dispatch(); /* select a new task to run */
 
     while (1) {
+        PORTB ^= _BV(PORTB6);
         cur_task->request = NONE; /* clear its request */
         cur_task->state = RUNNING;
 
@@ -256,6 +259,8 @@ void OS_Start() {
     cur_time = 0;
     if ((!kernel_active) && (num_tasks > 0)) {
         Disable_Interrupt();
+        enable_TIMER3();
+        enable_TIMER4();
         /* we may have to initialize the interrupt vector for Enter_Kernel() here.
         */
         /* here we go...  */
@@ -274,14 +279,24 @@ void enable_TIMER3() {
     // Current time interrupt
     TCCR3A = 0;
     TCCR3B = 0;
-    TCCR4B |= _BV(WGM32);
+    TCCR3B |= _BV(WGM32);
+    TCCR3B |= _BV(CS30);
     TCCR3B |= _BV(CS31);
-    OCR3A = ((F_CPU / 1000) / 8) * 10; //Fix timing later
+    OCR3A = 250 * 1000; //Fix timing later
     TIMSK3 |= _BV(OCIE3A);
     TCNT3 = 0;
 }
 
-
+void enable_TIMER4() {
+    TCCR4A = 0;
+    TCCR4B = 0;
+    TCCR4B |= _BV(WGM42);
+    TCCR3B |= _BV(CS40);
+    TCCR3B |= _BV(CS41);
+    OCR4A = 250;
+    TIMSK4 |= _BV(OCIE4A);
+    TCNT4 = 0;
+}
 
 void HighOne() {
     int i;
@@ -328,8 +343,6 @@ void main() {
     init_LED_D11();
     init_LED_D10();
 
-    enable_TIMER3();
-
     OS_Init();
     Task_Create_RR(Ping, 0);
     Task_Create_RR(Pong, 0);
@@ -340,12 +353,11 @@ void main() {
 
 
 ISR(TIMER3_COMPA_vect) {
-    cur_time++;
-    PORTB ^= _BV(PORTB6);
-    if (cur_time % MSECPERTICK == 0) {
-        if (kernel_active) {
-            cur_task->request = NEXT;
-            Enter_Kernel();
-        }
-    }
+    cur_task->request = NEXT;
+    Enter_Kernel();
+}
+
+
+ISR(TIMER4_COMPA_vect) {
+    (*ms)++;
 }
