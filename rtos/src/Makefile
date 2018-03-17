@@ -4,7 +4,7 @@
 #ARDUINO_DIR = <path to arduino installation>
 
 include .env
-BOARD_TAG = mega2560
+BOARD_TAG = mega
 BOARD_SUB = atmega2560
 USER_LIB_PATH = ../lib
 OBJDIR = ../bin
