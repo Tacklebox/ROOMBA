@@ -120,7 +120,7 @@ unsigned int Now();  // number of milliseconds since the RTOS boots.
 /*==================================================================
  *        S T A N D A R D   I N L I N E    P R O C E D U R E S
  *==================================================================
-/**
+ *
  * Booting:
  *  The RTOS and the main application are compiled into a single executable binary, but
  *  otherwise they are totally independent.
