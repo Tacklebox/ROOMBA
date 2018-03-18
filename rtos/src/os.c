@@ -208,6 +208,24 @@ BOOL Periodic_Task_Ready(task t) {
     return (delta >= 0) && t.state == READY && t.priority == MEDIUM;
 }
 
+void Manage_Periodic() {
+    int i;
+    int ready_count = 0;
+    for (i = 0; i < MAXTHREAD; i++) {
+        if ( Periodic_Task_Exceed_Time(tasks[i]) ) {
+            tasks[i].start_tick += tasks[i].period;
+        }
+
+        if ( Periodic_Task_Ready(tasks[i]) ) {
+            ready_count++;
+        }
+    }
+
+    if (ready_count > 1) {
+        throw_error(TIMING_CONFLICT_ERROR);
+    }
+}
+
 static void Dispatch() {
     /* find the next READY task
      * Note: if there is no READY task, then this will loop forever!.
@@ -219,23 +237,13 @@ static void Dispatch() {
     } else {
         // Periodic tasks
         int i;
-        int ready_count = 0;
-
         for (i = 0; i < MAXTHREAD; i++) {
-            if ( Periodic_Task_Exceed_Time(tasks[i]) ) {
-                tasks[i].start_tick += tasks[i].period;
-            }
-
             if ( Periodic_Task_Ready(tasks[i]) ) {
                 cand_task = &(tasks[i]);
-                ready_count++;
             }
         }
-
-        if (ready_count > 1) {
-            throw_error(TIMING_CONFLICT_ERROR);
-        }
     }
+
     if (cand_task == NULL && !queue_is_empty(low_queue)) {
         queue_remove(low_queue, &cand_task);
     }
@@ -286,6 +294,7 @@ static void Next_Kernel_Request() {
 
         /* save the Cp's stack pointer */
         cur_task->sp = CurrentSp;
+        Manage_Periodic();
 
         switch (cur_task->request) {
         case CREATE:
@@ -302,31 +311,24 @@ static void Next_Kernel_Request() {
             } else {
                 cur_task->state = SENDBLOCK;
             }
-            cur_task->request = NEXT;
             Push_Task(cur_task);
             Dispatch();
             break;
 
         case RECEIVE:
             cur_task->state = RECEIVEBLOCK;
-            cur_task->request = NEXT;
             Push_Task(cur_task);
             Dispatch();
             break;
 
         case REPLY:
             cur_task->state = READY;
-            cur_task->request = NEXT;
             task* sender = Find_Task_By_PID(cur_task->msg->sender);
             sender->state = READY;
             Push_Task(cur_task);
             Dispatch();
             break;
         case NEXT:
-            cur_task->sp = CurrentSp;
-            Push_Task(cur_task);
-            Dispatch();
-            break;
         case NONE:
             /* NONE could be caused by a timer interrupt */
             if (cur_task->priority != HIGHEST) { // HIGHEST non interruptible
@@ -558,12 +560,12 @@ int main() {
     enable_TIMER4();
 
     OS_Init();
-    // Task_Create_Period(Periodic_Test, 0, 100, 1, 0);
-    // Task_Create_Period(Periodic_Test2, 0, 100, 1, 5);
-    // Task_Create_System(HighOne, 0);
-    // Task_Create_System(HighTwo, 0);
-    Task_Create_RR(Receiver, 0);
-    Task_Create_RR(Sender, 0);
+    Task_Create_Period(Periodic_Test, 0, 100, 5, 0);
+    Task_Create_Period(Periodic_Test2, 0, 100, 5, 50);
+    Task_Create_System(HighOne, 0);
+    Task_Create_System(HighTwo, 0);
+    // Task_Create_RR(Receiver, 0);
+    // Task_Create_RR(Sender, 0);
     OS_Start();
 }
 
