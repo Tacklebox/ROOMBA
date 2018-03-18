@@ -8,6 +8,7 @@
 #include <util/delay.h>
 
 #define LED_BLINK_DURATION 500
+#define MAXMESSAGES 20
 
 typedef enum task_priority_type { HIGHEST = 0, MEDIUM, LOWEST, IDLE } task_priority;
 
@@ -16,7 +17,10 @@ typedef enum process_state_type {
     READY,
     WAITING,
     SLEEPING,
-    RUNNING
+    RUNNING,
+    SENDBLOCK,
+    REPLYBLOCK,
+    RECEIVEBLOCK
 } process_state;
 
 typedef enum kernel_request_type {
@@ -31,6 +35,14 @@ typedef enum kernel_request_type {
 
 typedef void (*voidfuncptr)(void);
 
+typedef struct message_type {
+    PID sender;
+    PID reciever;
+    MTYPE t;
+    unsigned int *v;
+    BOOL received;
+} message;
+
 typedef struct task_type {
     PID pid;
     voidfuncptr code;
@@ -44,6 +56,8 @@ typedef struct task_type {
     TICK offset;
     TICK start_tick;
     TICK wcet;
+    message* msg;
+    MASK mask;
 } task;
 
 extern void CSwitch();
@@ -57,6 +71,7 @@ volatile TICK ticks;
 volatile unsigned char *KernelSp;
 volatile unsigned char *CurrentSp;
 
+static message messages[MAXMESSAGES];
 static task tasks[MAXTHREAD];
 static queue_t high_queue;
 static queue_t low_queue;
@@ -93,6 +108,28 @@ void Task_Terminate() {
         Enter_Kernel();
         /* never returns here! */
     }
+}
+
+task* Find_Task_By_PID(PID pid) {
+    int i;
+    for (i = 0; i < MAXTHREAD; i++) {
+        if (tasks[i].pid == pid) {
+            return &(tasks[i]);
+        }
+    }
+    throw_error(PID_NOT_FOUND_ERROR);
+    return NULL;
+}
+
+message* Find_Empty_Message() {
+    int i;
+    for (i = 0; i < MAXMESSAGES; i++) {
+        if (messages[i].received) {
+            return &(messages[i]);
+        }
+    }
+    throw_error(EXCEED_MAXMESSAGES_ERROR);
+    return NULL;
 }
 
 PID Kernel_Create_Task_At(task *p, voidfuncptr f, int arg,
@@ -252,14 +289,41 @@ static void Next_Kernel_Request() {
 
         switch (cur_task->request) {
         case CREATE:
-            Kernel_Create_Task(cur_task->code, cur_task->arg, cur_task->priority,
-                               cur_task->period, cur_task->wcet, cur_task->offset);
+            Kernel_Create_Task(cur_task->code, cur_task->arg, cur_task->priority, cur_task->period, cur_task->wcet, cur_task->offset);
+            break;
+        case SEND:
+            ;// get rid of label error
+            task* reciever = Find_Task_By_PID(cur_task->msg->reciever);
+            if (reciever->state == RECEIVEBLOCK) {
+                // TODO: check mask?
+
+                cur_task->state = REPLYBLOCK;
+                reciever->msg = cur_task->msg;
+                reciever->state = READY;
+            } else {
+                cur_task->state = SENDBLOCK;
+            }
+
+            Push_Task(cur_task);
+            Dispatch();
+            break;
+
+        case RECEIVE:
+            cur_task->state = RECEIVEBLOCK;
+            Push_Task(cur_task);
+            Dispatch();
+            break;
+
+        case REPLY:
+            cur_task->state = READY;
+            task* sender = Find_Task_By_PID(cur_task->msg->sender);
+            Push_Task(cur_task);
+            Dispatch();
             break;
         case NEXT:
         case NONE:
             /* NONE could be caused by a timer interrupt */
-            if (cur_task->priority !=
-                    HIGHEST) { // HIGHEST non interruptible maybe move to Dispatch?
+            if (cur_task->priority != HIGHEST) { // HIGHEST non interruptible
                 cur_task->state = READY;
                 cur_task->sp = CurrentSp;
                 Push_Task(cur_task);
@@ -303,6 +367,13 @@ void _idle() {
     }
 }
 
+void Reset_Messages() {
+    int i;
+    for (i = 0; i < MAXMESSAGES; i++) {
+        messages[i].received = TRUE;
+    }
+}
+
 void OS_Init() {
     int x;
     num_tasks = 0;
@@ -311,6 +382,7 @@ void OS_Init() {
     high_queue = queue_create();
     Kernel_Create_Task_At(&idle_task, _idle, 0, IDLE, 0, 0 , 0);
     // Reminder: Clear the memory for the task on creation.
+    Reset_Messages();
     for (x = 0; x < MAXTHREAD; x++) {
         memset(&(tasks[x]), 0, sizeof(task));
         tasks[x].state = DEAD;
@@ -341,18 +413,52 @@ void OS_Start() {
     }
 }
 
-unsigned int Now() { return cur_time; }
+unsigned int Now() { return ticks * MSECPERTICK; }
 
 /*
  * IPC Section begin
  */
-void Msg_Send(PID id, MTYPE t, unsigned int *v) {}
+void Msg_Send(PID id, MTYPE t, unsigned int *v) {
+    Disable_Interrupt();
+    message* msg = Find_Empty_Message();
+    msg->received = FALSE;
+    msg->sender = cur_task->pid;
+    msg->reciever = id;
+    msg->v = v;
+    msg->t = t;
+    cur_task->msg = msg;
+    cur_task->request = SEND;
+    Enter_Kernel();
+    while (cur_task->state == SENDBLOCK) {
+        Task_Next();
+    }
+    while (cur_task->state == REPLYBLOCK) {
+        Task_Next();
+    }
+    msg->received = TRUE;
 
-PID Msg_Recv(MASK m, unsigned int *v) {}
+}
 
-void Msg_Rply(PID id, unsigned int r) {}
+PID Msg_Recv(MASK m, unsigned int *v) {
+    Disable_Interrupt();
+    cur_task->mask = m;
+    cur_task->request = RECEIVE;
+    Enter_Kernel();
+    while (cur_task->state == RECEIVEBLOCK) {
+        Task_Next();
+    }
+    return cur_task->msg->sender;
+}
 
-void Msg_ASend(PID id, MTYPE t, unsigned int v) {}
+void Msg_Rply(PID id, unsigned int r) {
+    *(cur_task->msg->v) = r;
+    cur_task->request = REPLY;
+    Enter_Kernel();
+}
+
+void Msg_ASend(PID id, MTYPE t, unsigned int v) {
+
+}
 /*
  * IPC Section end
  */
@@ -414,6 +520,21 @@ void Periodic_Test2() {
     }
 }
 
+void Sender() {
+    Msg_Send(cur_task->pid - 1, 't', 5);
+}
+
+void Receiver() {
+    unsigned int* v;
+    Msg_Recv(0, v);
+    int i;
+    for (i = 0; i < *v; i++) {
+        PORTB |= _BV(PORTB4);
+        _delay_ms(50);
+        PORTB &= ~_BV(PORTB4);
+    }
+}
+
 int main() {
     init_LED_D12();
     init_LED_D11();
@@ -421,10 +542,12 @@ int main() {
     enable_TIMER4();
 
     OS_Init();
-    Task_Create_Period(Periodic_Test, 0, 100, 1, 0);
-    Task_Create_Period(Periodic_Test2, 0, 100, 1, 0);
+    // Task_Create_Period(Periodic_Test, 0, 100, 1, 0);
+    // Task_Create_Period(Periodic_Test2, 0, 100, 1, 5);
     // Task_Create_System(HighOne, 0);
     // Task_Create_System(HighTwo, 0);
+    Task_Create_System(Receiver, 0);
+    Task_Create_System(Sender, 0);
     OS_Start();
 }
 
