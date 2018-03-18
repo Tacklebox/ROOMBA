@@ -37,7 +37,7 @@ typedef void (*voidfuncptr)(void);
 
 typedef struct message_type {
     PID sender;
-    PID reciever;
+    PID receiver;
     MTYPE t;
     unsigned int *v;
     BOOL received;
@@ -293,34 +293,40 @@ static void Next_Kernel_Request() {
             break;
         case SEND:
             ;// get rid of label error
-            task* reciever = Find_Task_By_PID(cur_task->msg->reciever);
-            if (reciever->state == RECEIVEBLOCK) {
+            task* receiver = Find_Task_By_PID(cur_task->msg->receiver);
+            if (receiver->state == RECEIVEBLOCK) {
                 // TODO: check mask?
-
                 cur_task->state = REPLYBLOCK;
-                reciever->msg = cur_task->msg;
-                reciever->state = READY;
+                receiver->msg = cur_task->msg;
+                receiver->state = READY;
             } else {
                 cur_task->state = SENDBLOCK;
             }
-
+            cur_task->request = NEXT;
             Push_Task(cur_task);
             Dispatch();
             break;
 
         case RECEIVE:
             cur_task->state = RECEIVEBLOCK;
+            cur_task->request = NEXT;
             Push_Task(cur_task);
             Dispatch();
             break;
 
         case REPLY:
             cur_task->state = READY;
+            cur_task->request = NEXT;
             task* sender = Find_Task_By_PID(cur_task->msg->sender);
+            sender->state = READY;
             Push_Task(cur_task);
             Dispatch();
             break;
         case NEXT:
+            cur_task->sp = CurrentSp;
+            Push_Task(cur_task);
+            Dispatch();
+            break;
         case NONE:
             /* NONE could be caused by a timer interrupt */
             if (cur_task->priority != HIGHEST) { // HIGHEST non interruptible
@@ -423,7 +429,7 @@ void Msg_Send(PID id, MTYPE t, unsigned int *v) {
     message* msg = Find_Empty_Message();
     msg->received = FALSE;
     msg->sender = cur_task->pid;
-    msg->reciever = id;
+    msg->receiver = id;
     msg->v = v;
     msg->t = t;
     cur_task->msg = msg;
@@ -435,8 +441,7 @@ void Msg_Send(PID id, MTYPE t, unsigned int *v) {
     while (cur_task->state == REPLYBLOCK) {
         Task_Next();
     }
-    msg->received = TRUE;
-
+    cur_task->msg->received = TRUE;
 }
 
 PID Msg_Recv(MASK m, unsigned int *v) {
@@ -447,6 +452,7 @@ PID Msg_Recv(MASK m, unsigned int *v) {
     while (cur_task->state == RECEIVEBLOCK) {
         Task_Next();
     }
+    memcpy(v, cur_task->msg->v, sizeof(*v));
     return cur_task->msg->sender;
 }
 
@@ -521,7 +527,15 @@ void Periodic_Test2() {
 }
 
 void Sender() {
-    Msg_Send(cur_task->pid - 1, 't', 5);
+    unsigned int msg = 5;
+    Msg_Send(cur_task->pid - 1, 't', &msg);
+    int i;
+    for (i = 0; i < msg; i++) {
+        PORTB |= _BV(PORTB5);
+        _delay_ms(500);
+        PORTB &= ~_BV(PORTB5);
+        _delay_ms(250);
+    }
 }
 
 void Receiver() {
@@ -530,9 +544,11 @@ void Receiver() {
     int i;
     for (i = 0; i < *v; i++) {
         PORTB |= _BV(PORTB4);
-        _delay_ms(50);
+        _delay_ms(500);
         PORTB &= ~_BV(PORTB4);
+        _delay_ms(250);
     }
+    Msg_Rply(cur_task->msg->sender, *v * 3 );
 }
 
 int main() {
@@ -546,8 +562,8 @@ int main() {
     // Task_Create_Period(Periodic_Test2, 0, 100, 1, 5);
     // Task_Create_System(HighOne, 0);
     // Task_Create_System(HighTwo, 0);
-    Task_Create_System(Receiver, 0);
-    Task_Create_System(Sender, 0);
+    Task_Create_RR(Receiver, 0);
+    Task_Create_RR(Sender, 0);
     OS_Start();
 }
 
