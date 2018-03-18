@@ -283,11 +283,17 @@ void enable_TIMER4() {
   TCCR4A = 0;
   TCCR4B = 0;
   TCCR4B |= _BV(WGM42);
-  TCCR3B |= _BV(CS40);
-  TCCR3B |= _BV(CS41);
-  OCR4A = 250;
+  TCCR4B |= _BV(CS42);
+  OCR4A = 62500;
   TIMSK4 |= _BV(OCIE4A);
   TCNT4 = 0;
+  /* TCCR4A = 0; */
+  /* TCCR4B = 0; */
+  /* TCCR4B |= _BV(WGM42); */
+  /* TCCR4B |= _BV(CS40) | _BV(CS41); */
+  /* OCR4A = 2500; */
+  /* TIMSK4 |= _BV(OCIE4A); */
+  /* TCNT4 = 0; */
 }
 
 void OS_Start() {
@@ -304,7 +310,9 @@ void OS_Start() {
   }
 }
 
-unsigned int Now() { return cur_time; }
+unsigned int Now() {
+  return (ticks * MSECPERTICK) + (TCNT4/250);
+}
 
 /*
  * IPC Section begin
@@ -365,12 +373,16 @@ int main() {
   init_LED_D11();
   init_LED_D10();
 
-  OS_Init();
-  Task_Create_RR(Ping, 0);
-  Task_Create_RR(Pong, 0);
-  Task_Create_System(HighOne, 0);
-  Task_Create_System(HighTwo, 0);
-  OS_Start();
+  PORTB |= _BV(PORTB5);
+  enable_TIMER4();
+  sei();
+  for(;;){}
+  /* OS_Init(); */
+  /* Task_Create_RR(Ping, 0); */
+  /* Task_Create_RR(Pong, 0); */
+  /* Task_Create_System(HighOne, 0); */
+  /* Task_Create_System(HighTwo, 0); */
+  /* OS_Start(); */
 }
 
 /* Disabled
@@ -378,8 +390,9 @@ ISR(TIMER3_COMPA_vect) {
 }
 */
 
-ISR(TIMER4_COMPA_vect) { 
-  was_tick = 1; 
-  cur_task->request = NEXT;
-  Enter_Kernel();
+ISR(TIMER4_COMPA_vect) {
+  PORTB ^= _BV(PORTB5);
+  /* was_tick = 1; */
+  /* cur_task->request = NEXT; */
+  /* Enter_Kernel(); */
 }
