@@ -57,6 +57,7 @@ typedef struct task_type {
     TICK start_tick;
     TICK wcet;
     message* msg;
+    queue_t msg_queue;
     MASK mask;
 } task;
 
@@ -177,6 +178,7 @@ PID Kernel_Create_Task_At(task *p, voidfuncptr f, int arg,
     p->offset = offset;
     p->start_tick = offset;
     p->wcet = wcet;
+    p->msg_queue = queue_create();
     return p->pid;
 }
 
@@ -308,16 +310,26 @@ static void Next_Kernel_Request() {
                 cur_task->state = REPLYBLOCK;
                 receiver->msg = cur_task->msg;
                 receiver->state = READY;
+                Push_Task(receiver); //wake up receiver
             } else {
+                queue_append(receiver->msg_queue, cur_task->msg);
                 cur_task->state = SENDBLOCK;
             }
-            Push_Task(cur_task);
             Dispatch();
             break;
 
         case RECEIVE:
-            cur_task->state = RECEIVEBLOCK;
-            Push_Task(cur_task);
+            if (!queue_is_empty(cur_task->msg_queue)) {
+                queue_remove(cur_task->msg_queue, &(cur_task->msg));
+                task* sender = Find_Task_By_PID(cur_task->msg->sender);
+                // receiver is ready
+                sender->state = REPLYBLOCK;
+                cur_task->state = READY;
+                Push_Task(cur_task);
+            } else {
+                // wait for someone else to wake me
+                cur_task->state = RECEIVEBLOCK;
+            }
             Dispatch();
             break;
 
@@ -326,8 +338,10 @@ static void Next_Kernel_Request() {
             task* sender = Find_Task_By_PID(cur_task->msg->sender);
             sender->state = READY;
             Push_Task(cur_task);
+            Push_Task(sender);
             Dispatch();
             break;
+
         case NEXT:
         case NONE:
             /* NONE could be caused by a timer interrupt */
@@ -338,6 +352,7 @@ static void Next_Kernel_Request() {
                 Dispatch();
             }
             break;
+
         case TERMINATE:
             /* deallocate all resources used by this task */
             cur_task->state = DEAD;
@@ -437,12 +452,7 @@ void Msg_Send(PID id, MTYPE t, unsigned int *v) {
     cur_task->msg = msg;
     cur_task->request = SEND;
     Enter_Kernel();
-    while (cur_task->state == SENDBLOCK) {
-        Task_Next();
-    }
-    while (cur_task->state == REPLYBLOCK) {
-        Task_Next();
-    }
+    //blocked by removing from exec queue
     cur_task->msg->received = TRUE;
 }
 
@@ -451,9 +461,7 @@ PID Msg_Recv(MASK m, unsigned int *v) {
     cur_task->mask = m;
     cur_task->request = RECEIVE;
     Enter_Kernel();
-    while (cur_task->state == RECEIVEBLOCK) {
-        Task_Next();
-    }
+    //blocked by removing from exec queue
     memcpy(v, cur_task->msg->v, sizeof(*v));
     return cur_task->msg->sender;
 }
@@ -530,7 +538,7 @@ void Periodic_Test2() {
 
 void Sender() {
     unsigned int msg = 5;
-    Msg_Send(cur_task->pid - 1, 't', &msg);
+    Msg_Send(cur_task->pid + 1, 't', &msg);
     int i;
     for (i = 0; i < msg; i++) {
         PORTB |= _BV(PORTB5);
@@ -553,6 +561,7 @@ void Receiver() {
     Msg_Rply(cur_task->msg->sender, *v * 3 );
 }
 
+
 int main() {
     init_LED_D12();
     init_LED_D11();
@@ -560,12 +569,12 @@ int main() {
     enable_TIMER4();
 
     OS_Init();
-    Task_Create_Period(Periodic_Test, 0, 100, 5, 0);
-    Task_Create_Period(Periodic_Test2, 0, 100, 5, 50);
-    Task_Create_System(HighOne, 0);
-    Task_Create_System(HighTwo, 0);
-    // Task_Create_RR(Receiver, 0);
-    // Task_Create_RR(Sender, 0);
+    // Task_Create_Period(Periodic_Test, 0, 100, 5, 0);
+    // Task_Create_Period(Periodic_Test2, 0, 100, 5, 50);
+    // Task_Create_System(HighOne, 0);
+    // Task_Create_System(HighTwo, 0);
+    Task_Create_System(Sender, 0);
+    Task_Create_System(Receiver, 0);
     OS_Start();
 }
 
