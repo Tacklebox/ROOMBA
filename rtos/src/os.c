@@ -30,7 +30,7 @@ typedef enum kernel_request_type {
     TERMINATE,
     SEND,
     RECEIVE,
-    REPLY
+    REPLY,
 } kernel_request;
 
 typedef void (*voidfuncptr)(void);
@@ -41,6 +41,8 @@ typedef struct message_type {
     MTYPE t;
     unsigned int *v;
     BOOL received;
+    BOOL async;
+    unsigned int av;
 } message;
 
 typedef struct task_type {
@@ -314,7 +316,13 @@ static void Next_Kernel_Request() {
             } else {
                 queue_append(receiver->msg_queue, cur_task->msg);
                 cur_task->state = SENDBLOCK;
+                // we block until woken up
             }
+            if (cur_task->msg->async) {
+                Push_Task(cur_task);
+                cur_task->state = READY;
+            }
+
             Dispatch();
             break;
 
@@ -323,7 +331,9 @@ static void Next_Kernel_Request() {
                 queue_remove(cur_task->msg_queue, &(cur_task->msg));
                 task* sender = Find_Task_By_PID(cur_task->msg->sender);
                 // receiver is ready
-                sender->state = REPLYBLOCK;
+                if (!cur_task->msg->async) {
+                    sender->state = REPLYBLOCK;
+                }
                 cur_task->state = READY;
                 Push_Task(cur_task);
             } else {
@@ -347,7 +357,7 @@ static void Next_Kernel_Request() {
             /* NONE could be caused by a timer interrupt */
             if (cur_task->priority != HIGHEST) { // HIGHEST non interruptible
                 cur_task->state = READY;
-                cur_task->sp = CurrentSp;
+                //cur_task->sp = CurrentSp;
                 Push_Task(cur_task);
                 Dispatch();
             }
@@ -451,11 +461,12 @@ void Msg_Send(PID id, MTYPE t, unsigned int *v) {
     msg->receiver = id;
     msg->v = v;
     msg->t = t;
+    msg->async = FALSE;
     cur_task->msg = msg;
     cur_task->request = SEND;
     Enter_Kernel();
     //blocked by removing from exec queue
-    cur_task->msg->received = TRUE;
+    cur_task->msg->received = TRUE; // msg can be deallocated
 }
 
 PID Msg_Recv(MASK m, unsigned int *v) {
@@ -464,7 +475,13 @@ PID Msg_Recv(MASK m, unsigned int *v) {
     cur_task->request = RECEIVE;
     Enter_Kernel();
     //blocked by removing from exec queue
-    memcpy(v, cur_task->msg->v, sizeof(*v));
+
+    if (cur_task->msg->async) {
+        memcpy(v, &(cur_task->msg->av), sizeof(*v));
+        cur_task->msg->received = TRUE;
+    } else {
+        memcpy(v, cur_task->msg->v, sizeof(*v));
+    }
     return cur_task->msg->sender;
 }
 
@@ -475,7 +492,17 @@ void Msg_Rply(PID id, unsigned int r) {
 }
 
 void Msg_ASend(PID id, MTYPE t, unsigned int v) {
-
+    Disable_Interrupt();
+    message* msg = Find_Empty_Message();
+    msg->received = FALSE;
+    msg->sender = cur_task->pid;
+    msg->receiver = id;
+    msg->av = v;
+    msg->t = t;
+    msg->async = TRUE;
+    cur_task->msg = msg;
+    cur_task->request = SEND;
+    Enter_Kernel();
 }
 /*
  * IPC Section end
@@ -530,16 +557,31 @@ void Periodic_Test() {
 }
 
 void Receiver() {
-    unsigned int* v;
-    Msg_Recv(0, v);
-    int i;
-    for (i = 0; i < *v; i++) {
-        PORTB |= _BV(PORTB4);
-        _delay_ms(500);
-        PORTB &= ~_BV(PORTB4);
-        _delay_ms(250);
+    for (;;) {
+        unsigned int* v;
+        Msg_Recv(0, v);
+        int i;
+        for (i = 0; i < *v; i++) {
+            PORTB |= _BV(PORTB4);
+            _delay_ms(500);
+            PORTB &= ~_BV(PORTB4);
+            _delay_ms(250);
+        }
+        if (!cur_task->msg->async) {
+            Msg_Rply(cur_task->msg->sender, *v * 3 );
+        }
     }
-    Msg_Rply(cur_task->msg->sender, *v * 3 );
+}
+
+void Async() {
+    for (;;) {
+        PORTB |= _BV(PORTB5);
+        _delay_ms(200);
+        PORTB &= ~_BV(PORTB5);
+        unsigned int v = 4;
+        Msg_ASend(cur_task->pid - 1, 'a' , v);
+        Task_Next();
+    }
 }
 
 
@@ -550,12 +592,13 @@ int main() {
     enable_TIMER4();
 
     OS_Init();
-    // Task_Create_Period(Periodic_Test, 0, 100, 5, 0);
     // Task_Create_Period(Periodic_Test2, 0, 100, 5, 50);
     // Task_Create_System(HighOne, 0);
     // Task_Create_System(HighTwo, 0);
-    Task_Create_System(Sender, 0);
-    Task_Create_System(Receiver, 0);
+    // Task_Create_RR(Sender, 0);
+    Task_Create_RR(Receiver, 0);
+    // Task_Create_Period(Periodic_Test, 0, 50, 25, );
+    Task_Create_Period(Async, 0, 200, 100, 0);
     OS_Start();
 }
 
