@@ -1,7 +1,9 @@
 #include <os.h>
 #include <uart.h>
+#include <joystick.h>
 #include <avr/io.h>
 #include <util/delay.h>
+#include <string.h>
 
 #define LED_BLINK_DURATION 500
 
@@ -103,25 +105,26 @@ void Pong() {
 //     }
 // }
 
-void TestUart() {
+void SampleJoystick() {
     char buffer[7];
-
     for (;;) {
-        sprintf(buffer, "test\n");
+        uint16_t x = read_analog(0);
+        uint16_t y = read_analog(1);
+        sprintf(buffer, "%2d,%2d\n", x, y);
         uart_send_string(buffer, 0);
         Task_Next();
     }
 }
 
-
 int main() {
+    setup_controllers();
     uart_init(UART_57600);
     // init_LED_D12(); 
     // init_LED_D11();
     // init_LED_D10();
 
     OS_Init();
-    Task_Create_Period(TestUart, 0, 100, 5, 50);
+    Task_Create_Period(SampleJoystick, 0, 100, 5, 50);
     // Task_Create_System(Ping, 0);
     // Task_Create_System(Pong, 0);
     // // Task_Create_RR(Sender, 0);

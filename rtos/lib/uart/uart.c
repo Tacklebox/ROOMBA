@@ -8,10 +8,6 @@
  */
 #include "uart.h"
 
-#define F_CPU 16000000UL
-
-
-
 static volatile uint8_t uart_buffer[UART_BUFFER_SIZE];
 static volatile uint8_t uart_buffer_1[UART_BUFFER_SIZE];
 

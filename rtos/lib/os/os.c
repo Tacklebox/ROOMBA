@@ -80,8 +80,6 @@ static queue_t low_queue;
 
 static task idle_task;
 
-static queue_t ipc_queue;
-
 volatile static task *cur_task;
 volatile static unsigned int num_tasks;
 volatile static unsigned int kernel_active;
@@ -405,6 +403,17 @@ void Reset_Messages() {
     }
 }
 
+void enable_TIMER4() {
+    TCCR4A = 0;
+    TCCR4B = 0;
+    TCCR4B |= _BV(WGM42);
+    TCCR4B |= _BV(CS40);
+    TCCR4B |= _BV(CS41);
+    OCR4A = 250 * MSECPERTICK;
+    TIMSK4 |= _BV(OCIE4A);
+    TCNT4 = 0;
+}
+
 void OS_Init() {
     enable_TIMER4();
     int x;
@@ -419,17 +428,6 @@ void OS_Init() {
         memset(&(tasks[x]), 0, sizeof(task));
         tasks[x].state = DEAD;
     }
-}
-
-void enable_TIMER4() {
-    TCCR4A = 0;
-    TCCR4B = 0;
-    TCCR4B |= _BV(WGM42);
-    TCCR4B |= _BV(CS40);
-    TCCR4B |= _BV(CS41);
-    OCR4A = 250 * MSECPERTICK;
-    TIMSK4 |= _BV(OCIE4A);
-    TCNT4 = 0;
 }
 
 void OS_Start() {

@@ -25,7 +25,7 @@ void servo_init(){
 
 	TCCR3B |= (1<<CS31)|(1<<CS30);
 
-	OCR3A=5000;  //20 ms period
+	OCR3A = 5000;  //20 ms period
 	OCR3B = 375;
 	OCR3C = 375;
 }
