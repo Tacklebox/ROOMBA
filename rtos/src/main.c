@@ -1,30 +1,29 @@
-// #include "os/os.h"
-#include "os/LED_Test.h"
-// #include <avr/io.h>
-// #include <util/delay.h>
+#include <os.h>
+#include <avr/io.h>
+#include <util/delay.h>
 
 // #define LED_BLINK_DURATION 500
 
 
-// void HighOne() {
-//     int i;
-//     for (i = 0; i < 5; i++) {
-//         PORTB = _BV(PORTB5);
-//         _delay_ms(50);
-//         PORTB ^= _BV(PORTB5);
-//         _delay_ms(500);
-//     }
-// }
+void HighOne() {
+    int i;
+    for (i = 0; i < 5; i++) {
+        PORTB = _BV(PORTB5);
+        _delay_ms(50);
+        PORTB ^= _BV(PORTB5);
+        _delay_ms(500);
+    }
+}
 
-// void HighTwo() {
-//     int i;
-//     for (i = 0; i < 5; i++) {
-//         PORTB = _BV(PORTB4);
-//         _delay_ms(50);
-//         PORTB ^= _BV(PORTB4);
-//         _delay_ms(500);
-//     }
-// }
+void HighTwo() {
+    int i;
+    for (i = 0; i < 5; i++) {
+        PORTB = _BV(PORTB4);
+        _delay_ms(50);
+        PORTB ^= _BV(PORTB4);
+        _delay_ms(500);
+    }
+}
 
 // //  TEST
 // void Ping() {
@@ -106,18 +105,18 @@
 
 int main() {
     init_LED_D12(); 
-    // init_LED_D11();
-    // init_LED_D10();
-    // enable_TIMER4();
+    init_LED_D11();
+    init_LED_D10();
+    enable_TIMER4();
 
-    // OS_Init();
-    // // Task_Create_Period(Periodic_Test2, 0, 100, 5, 50);
-    // // Task_Create_System(HighOne, 0);
-    // // Task_Create_System(HighTwo, 0);
-    // // Task_Create_RR(Sender, 0);
-    // // Task_Create_RR(Receiver, 0);
-    // // Task_Create_Period(Periodic_Test, 0, 50, 25, );
-    // // Task_Create_Period(Async, 0, 200, 100, 0);
-    // OS_Start();
+    OS_Init();
+    // Task_Create_Period(Periodic_Test2, 0, 100, 5, 50);
+    Task_Create_System(HighOne, 0);
+    Task_Create_System(HighTwo, 0);
+    // Task_Create_RR(Sender, 0);
+    // Task_Create_RR(Receiver, 0);
+    // Task_Create_Period(Periodic_Test, 0, 50, 25, );
+    // Task_Create_Period(Async, 0, 200, 100, 0);
+    OS_Start();
     return 1;
 }
