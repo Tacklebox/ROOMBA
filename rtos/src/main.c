@@ -1,48 +1,49 @@
 #include <os.h>
+#include <uart.h>
 #include <avr/io.h>
 #include <util/delay.h>
 
-// #define LED_BLINK_DURATION 500
+#define LED_BLINK_DURATION 500
 
 
-void HighOne() {
-    int i;
-    for (i = 0; i < 5; i++) {
-        PORTB = _BV(PORTB5);
-        _delay_ms(50);
-        PORTB ^= _BV(PORTB5);
-        _delay_ms(500);
-    }
-}
-
-void HighTwo() {
-    int i;
-    for (i = 0; i < 5; i++) {
-        PORTB = _BV(PORTB4);
-        _delay_ms(50);
-        PORTB ^= _BV(PORTB4);
-        _delay_ms(500);
-    }
-}
-
-// //  TEST
-// void Ping() {
-//     for (;;) {
-//         PORTB |= _BV(PORTB4);
-//         _delay_ms(LED_BLINK_DURATION);
-//         PORTB &= ~_BV(PORTB4);
+// void HighOne() {
+//     int i;
+//     for (i = 0; i < 5; i++) {
+//         PORTB = _BV(PORTB5);
+//         _delay_ms(50);
+//         PORTB ^= _BV(PORTB5);
 //         _delay_ms(500);
 //     }
 // }
 
-// void Pong() {
-//     for (;;) {
-//         PORTB |= _BV(PORTB5);
-//         _delay_ms(LED_BLINK_DURATION);
-//         PORTB &= ~_BV(PORTB5);
+// void HighTwo() {
+//     int i;
+//     for (i = 0; i < 5; i++) {
+//         PORTB = _BV(PORTB4);
+//         _delay_ms(50);
+//         PORTB ^= _BV(PORTB4);
 //         _delay_ms(500);
 //     }
 // }
+
+//  TEST
+void Ping() {
+    for (;;) {
+        PORTB |= _BV(PORTB5);
+        _delay_ms(LED_BLINK_DURATION);
+        PORTB &= ~_BV(PORTB5);
+        _delay_ms(500);
+    }
+}
+
+void Pong() {
+    for (;;) {
+        PORTB |= _BV(PORTB6);
+        _delay_ms(LED_BLINK_DURATION);
+        PORTB &= ~_BV(PORTB6);
+        _delay_ms(500);
+    }
+}
 
 // void Periodic_Test() {
 //     for (;;) {
@@ -102,21 +103,31 @@ void HighTwo() {
 //     }
 // }
 
+void TestUart() {
+    char buffer[7];
+
+    for (;;) {
+        sprintf(buffer, "test\n");
+        uart_send_string(buffer, 0);
+        Task_Next();
+    }
+}
+
 
 int main() {
-    init_LED_D12(); 
-    init_LED_D11();
-    init_LED_D10();
-    enable_TIMER4();
+    uart_init(UART_57600);
+    // init_LED_D12(); 
+    // init_LED_D11();
+    // init_LED_D10();
 
     OS_Init();
-    // Task_Create_Period(Periodic_Test2, 0, 100, 5, 50);
-    Task_Create_System(HighOne, 0);
-    Task_Create_System(HighTwo, 0);
-    // Task_Create_RR(Sender, 0);
-    // Task_Create_RR(Receiver, 0);
-    // Task_Create_Period(Periodic_Test, 0, 50, 25, );
-    // Task_Create_Period(Async, 0, 200, 100, 0);
+    Task_Create_Period(TestUart, 0, 100, 5, 50);
+    // Task_Create_System(Ping, 0);
+    // Task_Create_System(Pong, 0);
+    // // Task_Create_RR(Sender, 0);
+    // // Task_Create_RR(Receiver, 0);
+    // // Task_Create_Period(Periodic_Test, 0, 50, 25, );
+    // // Task_Create_Period(Async, 0, 200, 100, 0);
     OS_Start();
     return 1;
 }

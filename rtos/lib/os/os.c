@@ -406,6 +406,7 @@ void Reset_Messages() {
 }
 
 void OS_Init() {
+    enable_TIMER4();
     int x;
     num_tasks = 0;
     kernel_active = 0;
