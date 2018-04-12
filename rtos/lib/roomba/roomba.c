@@ -19,8 +19,8 @@
 #define DD_DDR DDRC
 #define DD_PORT PORTC
 #define DD_PIN PC5
-#define ROOMBA_UART 0
-#define BT_UART 1
+#define ROOMBA_UART 1
+#define BT_UART 2
 
 STATUS_LED_STATE status = LED_OFF;
 LED_STATE spot = LED_OFF;
@@ -60,25 +60,25 @@ void Roomba_Init()
 	uart_putchar(START, ROOMBA_UART);
 	_delay_ms(20);
 
-	// See the appropriate AVR hardware specification, at the end of the USART section, for a table of baud rate
-	// framing error probabilities.  The best we can do with a 16 or 8 MHz crystal is 38400 bps, which has a framing
-	// error rate of 0.2% (1 bit out of every 500).  Well, the best is 76800 bps, but the Roomba doesn't support
-	// that.  38400 at 0.2% is sufficient for our purposes.  An 18.432 MHz crystal will generate all the Roomba's
-	// baud rates with 0.0% error!.  Anyway, the point is we want to use a 38400 bps baud rate to avoid framing
-	// errors.  Also, we have to wait for 100 ms after changing the baud rate.
-	uart_putchar(BAUD, ROOMBA_UART);
-	uart_putchar(ROOMBA_38400BPS, ROOMBA_UART);
-	_delay_ms(100);
+	// // See the appropriate AVR hardware specification, at the end of the USART section, for a table of baud rate
+	// // framing error probabilities.  The best we can do with a 16 or 8 MHz crystal is 38400 bps, which has a framing
+	// // error rate of 0.2% (1 bit out of every 500).  Well, the best is 76800 bps, but the Roomba doesn't support
+	// // that.  38400 at 0.2% is sufficient for our purposes.  An 18.432 MHz crystal will generate all the Roomba's
+	// // baud rates with 0.0% error!.  Anyway, the point is we want to use a 38400 bps baud rate to avoid framing
+	// // errors.  Also, we have to wait for 100 ms after changing the baud rate.
+	// uart_putchar(BAUD, ROOMBA_UART);
+	// uart_putchar(ROOMBA_38400BPS, ROOMBA_UART);
+	// _delay_ms(100);
 
-	// change the AVR's UART clock to the new baud rate.
-	uart_init(UART_38400);
+	// // change the AVR's UART clock to the new baud rate.
+	// uart_init(UART_38400);
 
 	// put the Roomba into safe mode.
 	uart_putchar(CONTROL, ROOMBA_UART);
 	_delay_ms(20);
 
 	// Set the Roomba's LEDs to the defaults defined above (to verify defaults).
-	//update_leds();
+	update_leds();
 }
 
 /**

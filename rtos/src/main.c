@@ -1,136 +1,78 @@
 #include <os.h>
 #include <uart.h>
 #include <joystick.h>
+#include <servo.h>
+#include <roomba.h>
 #include <avr/io.h>
 #include <util/delay.h>
 #include <string.h>
 
 #define LED_BLINK_DURATION 500
-
-
-// void HighOne() {
-//     int i;
-//     for (i = 0; i < 5; i++) {
-//         PORTB = _BV(PORTB5);
-//         _delay_ms(50);
-//         PORTB ^= _BV(PORTB5);
-//         _delay_ms(500);
-//     }
-// }
-
-// void HighTwo() {
-//     int i;
-//     for (i = 0; i < 5; i++) {
-//         PORTB = _BV(PORTB4);
-//         _delay_ms(50);
-//         PORTB ^= _BV(PORTB4);
-//         _delay_ms(500);
-//     }
-// }
-
-//  TEST
-void Ping() {
-    for (;;) {
-        PORTB |= _BV(PORTB5);
-        _delay_ms(LED_BLINK_DURATION);
-        PORTB &= ~_BV(PORTB5);
-        _delay_ms(500);
-    }
-}
-
-void Pong() {
-    for (;;) {
-        PORTB |= _BV(PORTB6);
-        _delay_ms(LED_BLINK_DURATION);
-        PORTB &= ~_BV(PORTB6);
-        _delay_ms(500);
-    }
-}
-
-// void Periodic_Test() {
-//     for (;;) {
-//         PORTB |= _BV(PORTB5);
-//         _delay_ms(10);
-//         PORTB &= ~_BV(PORTB5);
-//         Task_Next();
-//     }
-// }
-
-// void Periodic_Test2() {
-//     for (;;) {
-//         PORTB |= _BV(PORTB4);
-//         _delay_ms(10);
-//         PORTB &= ~_BV(PORTB4);
-//         Task_Next();
-//     }
-// }
-
-// void Sender() {
-//     unsigned int msg = 5;
-//     Msg_Send(cur_task->pid + 1, 't', &msg);
-//     int i;
-//     for (i = 0; i < msg; i++) {
-//         PORTB |= _BV(PORTB5);
-//         _delay_ms(500);
-//         PORTB &= ~_BV(PORTB5);
-//         _delay_ms(250);
-//     }
-// }
-
-// void Receiver() {
-//     for (;;) {
-//         unsigned int* v;
-//         Msg_Recv(0, v);
-//         int i;
-//         for (i = 0; i < *v; i++) {
-//             PORTB |= _BV(PORTB4);
-//             _delay_ms(500);
-//             PORTB &= ~_BV(PORTB4);
-//             _delay_ms(250);
-//         }
-//         if (!cur_task->msg->async) {
-//             Msg_Rply(cur_task->msg->sender, *v * 3 );
-//         }
-//     }
-// }
-
-// void Async() {
-//     for (;;) {
-//         PORTB |= _BV(PORTB5);
-//         _delay_ms(200);
-//         PORTB &= ~_BV(PORTB5);
-//         unsigned int v = 4;
-//         Msg_ASend(cur_task->pid - 1, 'a' , v);
-//         Task_Next();
-//     }
-// }
+uint16_t x = 0;
+uint16_t y = 0;
+roomba_sensor_data_t roomba_data;
 
 void SampleJoystick() {
+    for (;;) {
+        x = read_analog(0);
+        y = read_analog(1);
+        Task_Next();
+    }
+}
+
+void SetServoPositions() {
     char buffer[7];
     for (;;) {
-        uint16_t x = read_analog(0);
-        uint16_t y = read_analog(1);
         sprintf(buffer, "%2d,%2d\n", x, y);
+        uart_send_string(buffer, 0);
+        servo_set_pin3(x / 2);
+        servo_set_pin2(y / 2);
+        Task_Next();
+    }
+}
+
+void SampleRoombaData() {
+    char buffer[10];
+    for (;;) {
+        Roomba_UpdateSensorPacket(EXTERNAL, &roomba_data);
+        sprintf(buffer, "%2d\n", roomba_data.bumps_wheeldrops);
         uart_send_string(buffer, 0);
         Task_Next();
     }
 }
 
+void ControlRoomba() {
+    for (;;) {
+        if(x > 512){
+            Roomba_Drive(1, 0);
+        }else{
+            Roomba_Drive(-1, 0);
+        }
+    }
+}
+
 int main() {
+    init_LED_D12();
+    PORTB |= _BV(PORTB6);
     setup_controllers();
-    uart_init(UART_57600);
-    // init_LED_D12(); 
-    // init_LED_D11();
-    // init_LED_D10();
+    uart_init(UART_19200);
+    servo_init();
+    Roomba_Init();
+    // roomba_data.bumps_wheeldrops = 0;
+    Roomba_ChangeState(SAFE_MODE);
+    // Roomba_ConfigPowerLED(0, 125);
+    // char buffer[10];
+    // Roomba_UpdateSensorPacket(EXTERNAL, &roomba_data);
+    Roomba_Drive(10, 5);
+    // sprintf(buffer, "%2d\n", roomba_data.bumps_wheeldrops);
+    // uart_send_string(buffer, 0);
+
 
     OS_Init();
-    Task_Create_Period(SampleJoystick, 0, 100, 5, 50);
-    // Task_Create_System(Ping, 0);
-    // Task_Create_System(Pong, 0);
-    // // Task_Create_RR(Sender, 0);
-    // // Task_Create_RR(Receiver, 0);
-    // // Task_Create_Period(Periodic_Test, 0, 50, 25, );
-    // // Task_Create_Period(Async, 0, 200, 100, 0);
+    Task_Create_Period(SampleJoystick, 0, 50, 5, 0);
+    //Task_Create_Period(ControlRoomba, 0, 50, 5, 10);
+    //Task_Create_Period(SetServoPositions, 0, 50, 5, 10);
+    //Task_Create_Period(SampleRoombaData, 0, 50, 25, 20);
     OS_Start();
     return 1;
 }

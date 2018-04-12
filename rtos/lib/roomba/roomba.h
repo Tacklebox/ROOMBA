@@ -8,8 +8,8 @@
 #define DD_DDR DDRC
 #define DD_PORT PORTC
 #define DD_PIN PC5
-#define ROOMBA_UART 0
-#define BT_UART 1
+#define ROOMBA_UART 1
+#define BT_UART 2
 
 typedef enum _rsg
 {
