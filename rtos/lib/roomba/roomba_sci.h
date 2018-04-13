@@ -8,25 +8,29 @@
 #ifndef ROOMBA_SCI_H_
 #define ROOMBA_SCI_H_
 
+#define HIGH_BYTE(x) (x>>8)
+#define LOW_BYTE(x)  (x&0xFF)
+
 /*****											Commands										*****/
 
+#define RESET	7
 #define START	128		// start the Roomba's serial command interface
 #define BAUD	129		// set the SCI's baudrate (default on full power cycle is 57600
 #define CONTROL	130		// enable control via SCI
 #define SAFE	131		// enter safe mode
 #define FULL	132		// enter full mode
 #define POWER	133		// put the Roomba to sleep
-#define SPOT	134		// start spot cleaning cycle
-#define CLEAN	135		// start normal cleaning cycle
-#define MAX		136		// start maximum time cleaning cycle
+//#define SPOT	134		// start spot cleaning cycle
+//#define CLEAN	135		// start normal cleaning cycle
+//#define MAX		136		// start maximum time cleaning cycle
 #define DRIVE	137		// control wheels
-#define MOTORS	138		// turn cleaning motors on or off
 #define LEDS	139		// activate LEDs
 #define SONG	140		// load a song into memory
 #define PLAY	141		// play a song that was loaded using SONG
 #define SENSORS	142		// retrieve one of the sensor packets
 #define DOCK	143		// force the Roomba to seek its dock.
-#define DIRECT 	145		
+
+#define STOP	173
 
 /*****											Arguments										*****/
 
@@ -59,20 +63,6 @@ typedef enum _br {
 #define MAX_LED			1
 #define DIRT_DETECT		0
 
-typedef enum _led
-{
-	LED_OFF,
-	LED_ON,
-} LED_STATE;
-
-typedef enum _sled
-{
-	STATUS_LED_OFF,
-	RED,
-	GREEN,
-	AMBER,
-} STATUS_LED_STATE;
-
 /*****											Sensor Bits										*****/
 
 /// Bits in the Bumps/Wheeldrops byte
@@ -95,6 +85,20 @@ typedef enum _sled
 #define CLEAN_BTN		1
 #define MAX_BTN			0
 
+/// Number to determine the current OI mode of the roomba
+#define ROOMBA_MODE_OFF 	0
+#define ROOMBA_MODE_PASSIVE 1
+#define ROOMBA_MODE_SAFE	2
+#define ROOMBA_MODE_FULL	3
+
+/// bit mask for querying the LightBumperDetection field
+#define LIGHT_BUMPER_RIGHT 			5
+#define LIGHT_BUMPER_FRONT_RIGHT	4
+#define LIGHT_BUMPER_CENTER_RIGHT	3
+#define LIGHT_BUMPER_CENTER_LEFT	2
+#define LIGHT_BUMPER_FRONT_LEFT		1
+#define LIGHT_BUMPER_LEFT 			0
+
 /// Values of the charging state byte
 typedef enum _cs
 {
@@ -105,5 +109,12 @@ typedef enum _cs
 	WAITING = 4,
 	CHARGING_ERROR = 5,
 } ROOMBA_CHARGING_STATE;
+
+
+//DD/Baud pin on digital 20.
+#define ROOMBA_DD_PORT	PORTD
+#define ROOMBA_DD_PIN	PD1
+#define ROOMBA_DD_DDR	DDRD
+
 
 #endif /* ROOMBA_SCI_H_ */

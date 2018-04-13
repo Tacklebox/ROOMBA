@@ -60,7 +60,7 @@ int8_t UART_Receive1_Non_Blocking() {
 	return -1;
 }
 
-void UART_print(const char* fmt, ...) {
+void UART_print0(const char* fmt, ...) {
 	uint16_t sreg = SREG;
 	cli();
 	char buffer[TX_BUFFER_SIZE];
@@ -79,6 +79,29 @@ void UART_print(const char* fmt, ...) {
 	uint8_t i = 0;
 	while (i < size) {
 		UART_Transmit0(buffer[i++]);
+	}
+	SREG = sreg;
+}
+
+void UART_print1(const char* fmt, ...) {
+	uint16_t sreg = SREG;
+	cli();
+	char buffer[TX_BUFFER_SIZE];
+	va_list args;
+	size_t size;
+
+	va_start(args, fmt);
+	size = vsnprintf(buffer, sizeof(buffer), fmt, args);
+	va_end(args);
+
+	// Error case: do not output to UART
+	if (size < 0) {
+		return;
+	}
+
+	uint8_t i = 0;
+	while (i < size) {
+		UART_Transmit1(buffer[i++]);
 	}
 	SREG = sreg;
 }

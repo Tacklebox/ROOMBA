@@ -1,13 +1,11 @@
 #include <os.h>
-#include <BlockingUART.h>
-#include <RoombaUART.h>
+#include <uart.h>
 #include <joystick.h>
 #include <servo.h>
 #include <roomba.h>
 #include <avr/io.h>
 #include <util/delay.h>
 #include <string.h>
-#include "../lib/roomba/roomba_sci.h"
 
 #define LED_BLINK_DURATION 500
 #define MOVE_SPEED 300
@@ -32,9 +30,7 @@ void sample_joysticks() {
     char buffer[7];
     for (;;) {
         sprintf(buffer, "%2d,%2d\n", x, y);
-        for(int i = 0; i < strlen(buffer); i++) {
-            UART_Transmit0(buffer[i]);
-        }
+        uart_send_string(buffer, 0);
         x = read_analog(JOYSTICK_1_X);
         y = read_analog(JOYSTICK_1_Y);
         Task_Next();
@@ -45,9 +41,7 @@ void set_servo_positions() {
     char buffer[7];
     for (;;) {
         sprintf(buffer, "%2d,%2d\n", x, y);
-        for(int i = 0; i < strlen(buffer); i++) {
-            UART_Transmit0(buffer[i]);
-        }
+        uart_send_string(buffer, 0);
         servo_set_pin3(x / 2);
         servo_set_pin2(y / 2);
         Task_Next();
@@ -59,9 +53,7 @@ void sample_roomba_sensor_data() {
     for (;;) {
         Roomba_UpdateSensorPacket(EXTERNAL, &roomba_data);
         sprintf(buffer, "%2d\n", roomba_data.bumps_wheeldrops);
-        for(int i = 0; i < strlen(buffer); i++) {
-            UART_Transmit0(buffer[i]);
-        }
+        uart_send_string(buffer, 0);
         Task_Next();
     }
 }
@@ -85,9 +77,7 @@ void sample_ir_sensor() {
         }
         avg_ir = sum / size;
         sprintf(buffer, "%d, %d\n", avg_ir, cur_ir);
-        for(int i = 0; i < strlen(buffer); i++) {
-            UART_Transmit0(buffer[i]);
-        }
+        uart_send_string(buffer, 0);
 
 
 
@@ -100,33 +90,23 @@ void control_roomba() {
     for (;;) {
         if(x > FORWARD_GATE){
             sprintf(buffer, "forward\n");
-            for(int i = 0; i < strlen(buffer); i++) {
-                UART_Transmit0(buffer[i]);
-            }
+            uart_send_string(buffer, 0);
             Roomba_Drive(1 * MOVE_SPEED, 0);
         }else if(x < BACKWARD_GATE){
             sprintf(buffer, "backward\n");
-            for(int i = 0; i < strlen(buffer); i++) {
-                UART_Transmit0(buffer[i]);
-            }
+            uart_send_string(buffer, 0);
             Roomba_Drive(-1 * MOVE_SPEED, 0);
         }else if(y > LEFT_GATE){
             sprintf(buffer, "left\n");
-            for(int i = 0; i < strlen(buffer); i++) {
-                UART_Transmit0(buffer[i]);
-            }
+            uart_send_string(buffer, 0);
             Roomba_DriveDirect(1 * ROTATE_SPEED, -1 * ROTATE_SPEED);
         }else if(y < RIGHT_GATE){
             sprintf(buffer, "right\n");
-            for(int i = 0; i < strlen(buffer); i++) {
-                UART_Transmit0(buffer[i]);
-            }
+            uart_send_string(buffer, 0);
             Roomba_DriveDirect(-1 * ROTATE_SPEED, 1 * ROTATE_SPEED);
         }else {
             sprintf(buffer, "stop\n");
-            for(int i = 0; i < strlen(buffer); i++) {
-                UART_Transmit0(buffer[i]);
-            }
+            uart_send_string(buffer, 0);
             Roomba_Drive(0, 0);
         }
         Task_Next();
@@ -137,18 +117,17 @@ int main() {
     init_LED_D12();
     PORTB |= _BV(PORTB6);
     setup_controllers();
-    UART_Init0(19200);
-    UART_Init1(19200);
+    uart_init(UART_19200);
     servo_init();
     Roomba_Init();
     Roomba_ChangeState(SAFE_MODE);
     _delay_ms(20);
-    //Roomba_ConfigPowerLED(128, 128);
+    Roomba_ConfigPowerLED(128, 128);
     OS_Init();
     // Task_Create_Period(sample_joysticks, 0, 20, 2, 0);
-    Task_Create_Period(sample_roomba_sensor_data, 0, 20, 2, 3);
+    // Task_Create_Period(sample_roomba_sensor_data, 0, 20, 2, 3);
     // Task_Create_Period(control_roomba, 0, 20, 2, 6);
-    //Task_Create_Period(sample_ir_sensor, 0, 20, 1, 15);
+    Task_Create_Period(sample_ir_sensor, 0, 20, 1, 15);
     OS_Start();
     return 1;
 }
