@@ -38,8 +38,8 @@ void uart_init(UART_BPS bitrate)
 	
 	//9600 baud will be 207
 	
-	UBRR0 = 51;
-	UBRR1 = 207;
+	// UBRR0 = 51;
+	// UBRR1 = 207;
 
 	// See the appropriate AVR hardware specification for a table of UBBR values at different
 	// clock speeds.*/
@@ -47,21 +47,20 @@ void uart_init(UART_BPS bitrate)
 	{
 
 	case UART_19200:
-		UBRR0L = 103;
-		//UBRR1L = 103;
+		UBRR0 = 102;
+		UBRR1 = 102;
 		break;
 	case UART_38400:
-		UBRR0L = 51;
-		//UBRR1L = 51;
+		UBRR0 = 51;
+		UBRR1 = 51;
 		break;
 	case UART_57600:
-		UBRR0L = 34;
-		//UBRR1L = 34;
+		UBRR0 = 25;
+		UBRR1 = 25;
 		break;
 	default:
-		UBRR0L = 103;
-		//UBRR1L = 103;
-
+		UBRR0 = 102;
+		UBRR1 = 102;
 	}
 
     uart_buffer_index = 0;
