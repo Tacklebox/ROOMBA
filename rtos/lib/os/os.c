@@ -442,8 +442,8 @@ void OS_Start() {
         /* NEVER RETURNS!!! */
     }
 }
-
-unsigned int Now() { return ticks * MSECPERTICK; }
+ 
+unsigned int Now() { return ((ticks * MSECPERTICK) + (TCNT4 / 250)); }
 
 /*
  * IPC Section begin

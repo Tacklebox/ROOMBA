@@ -12,6 +12,7 @@
 #include "roomba.h"
 #include "roomba_sci.h"
 #include "sensor_struct.h"
+#include "../os/os.h"
 
 #define LOW_BYTE(v)   ((unsigned char) (v))
 #define HIGH_BYTE(v)  ((unsigned char) (((unsigned int) (v)) >> 8))
@@ -21,6 +22,7 @@
 #define DD_PIN PC5
 #define ROOMBA_UART 1
 #define BT_UART 2
+#define TIMEOUT_MS 50
 
 STATUS_LED_STATE status = LED_OFF;
 LED_STATE spot = LED_OFF;
@@ -90,20 +92,26 @@ void Roomba_Init()
  * function doesn't enter an infinite loop if a byte is missed.  You'll have to modify this function
  * and insert it into Roomba_UpdateSensorPacket to suit your application.
  */
-/*
-uint8_t wait_for_bytes(uint8_t num_bytes, uint8_t timeout)
+
+uint8_t wait_for_bytes(int uart, uint8_t num_bytes, uint8_t timeout)
 {
 	uint16_t start;
 	start = Now();	// current system time
-	while (Now() - start < timeout && uart_bytes_received() != num_bytes);
-	if (uart_bytes_received() >= num_bytes)
+	while (((Now() - start) < timeout) && uart_bytes_received(uart) < num_bytes){
+		uint8_t test = uart_bytes_received(uart);
+		char buffer[10];
+		sprintf(buffer, "b:%d\n", test);
+    	uart_send_string(buffer, 0);
+	}
+	if (uart_bytes_received(uart) >= num_bytes)
 		return 1;
 	else
 		return 0;
-}*/
+}
 
 void Roomba_UpdateSensorPacket(ROOMBA_SENSOR_GROUP group, roomba_sensor_data_t* sensor_packet)
 {
+	uart_reset_receive(ROOMBA_UART);
 	// No, I don't feel bad about manual loop unrolling.
 	uart_putchar(SENSORS, ROOMBA_UART);
 	uart_putchar(group, ROOMBA_UART);
@@ -111,41 +119,49 @@ void Roomba_UpdateSensorPacket(ROOMBA_SENSOR_GROUP group, roomba_sensor_data_t* 
 	{
 	case EXTERNAL:
 		// environment sensors
-		while (uart_bytes_received(ROOMBA_UART) != 10);
-		sensor_packet->bumps_wheeldrops = uart_get_byte(0, ROOMBA_UART);
-		sensor_packet->wall = uart_get_byte(1, ROOMBA_UART);
-		sensor_packet->cliff_left = uart_get_byte(2, ROOMBA_UART);
-		sensor_packet->cliff_front_left = uart_get_byte(3, ROOMBA_UART);
-		sensor_packet->cliff_front_right = uart_get_byte(4, ROOMBA_UART);
-		sensor_packet->cliff_right = uart_get_byte(5, ROOMBA_UART);
-		sensor_packet->virtual_wall = uart_get_byte(6, ROOMBA_UART);
-		sensor_packet->motor_overcurrents = uart_get_byte(7, ROOMBA_UART);
-		sensor_packet->dirt_left = uart_get_byte(8, ROOMBA_UART);
-		sensor_packet->dirt_right = uart_get_byte(9, ROOMBA_UART);
+		if (wait_for_bytes(ROOMBA_UART, 10, TIMEOUT_MS)) {		
+			sensor_packet->bumps_wheeldrops = uart_get_byte(0, ROOMBA_UART);
+			sensor_packet->wall = uart_get_byte(1, ROOMBA_UART);
+			sensor_packet->cliff_left = uart_get_byte(2, ROOMBA_UART);
+			sensor_packet->cliff_front_left = uart_get_byte(3, ROOMBA_UART);
+			sensor_packet->cliff_front_right = uart_get_byte(4, ROOMBA_UART);
+			sensor_packet->cliff_right = uart_get_byte(5, ROOMBA_UART);
+			sensor_packet->virtual_wall = uart_get_byte(6, ROOMBA_UART);
+			sensor_packet->motor_overcurrents = uart_get_byte(7, ROOMBA_UART);
+			sensor_packet->dirt_left = uart_get_byte(8, ROOMBA_UART);
+			sensor_packet->dirt_right = uart_get_byte(9, ROOMBA_UART);
+		}else{
+			char buffer[10];
+		    sprintf(buffer, "fail\n");
+    		uart_send_string(buffer, 0);
+		}
+
 		break;
 	case CHASSIS:
 		// chassis sensors
-		while (uart_bytes_received(ROOMBA_UART) != 6);
-		sensor_packet->remote_opcode = uart_get_byte(0, ROOMBA_UART);
-		sensor_packet->buttons = uart_get_byte(1, ROOMBA_UART);
-		sensor_packet->distance.bytes.high_byte = uart_get_byte(2, ROOMBA_UART);
-		sensor_packet->distance.bytes.low_byte = uart_get_byte(3, ROOMBA_UART);
-		sensor_packet->angle.bytes.high_byte = uart_get_byte(4, ROOMBA_UART);
-		sensor_packet->angle.bytes.low_byte = uart_get_byte(5, ROOMBA_UART);
+		if (wait_for_bytes(ROOMBA_UART, 6, TIMEOUT_MS)) {
+			sensor_packet->remote_opcode = uart_get_byte(0, ROOMBA_UART);
+			sensor_packet->buttons = uart_get_byte(1, ROOMBA_UART);
+			sensor_packet->distance.bytes.high_byte = uart_get_byte(2, ROOMBA_UART);
+			sensor_packet->distance.bytes.low_byte = uart_get_byte(3, ROOMBA_UART);
+			sensor_packet->angle.bytes.high_byte = uart_get_byte(4, ROOMBA_UART);
+			sensor_packet->angle.bytes.low_byte = uart_get_byte(5, ROOMBA_UART);
+		}
 		break;
 	case INTERNAL:
 		// internal sensors
-		while (uart_bytes_received(ROOMBA_UART) != 10);
-		sensor_packet->charging_state = uart_get_byte(0, ROOMBA_UART);
-		sensor_packet->voltage.bytes.high_byte = uart_get_byte(1, ROOMBA_UART);
-		sensor_packet->voltage.bytes.low_byte = uart_get_byte(2, ROOMBA_UART);
-		sensor_packet->current.bytes.high_byte = uart_get_byte(3, ROOMBA_UART);
-		sensor_packet->current.bytes.low_byte = uart_get_byte(4, ROOMBA_UART);
-		sensor_packet->temperature = uart_get_byte(5, ROOMBA_UART);
-		sensor_packet->charge.bytes.high_byte = uart_get_byte(6, ROOMBA_UART);
-		sensor_packet->charge.bytes.low_byte = uart_get_byte(7, ROOMBA_UART);
-		sensor_packet->capacity.bytes.high_byte = uart_get_byte(8, ROOMBA_UART);
-		sensor_packet->capacity.bytes.low_byte = uart_get_byte(9, ROOMBA_UART);
+		if (wait_for_bytes(ROOMBA_UART, 10, TIMEOUT_MS)) {
+			sensor_packet->charging_state = uart_get_byte(0, ROOMBA_UART);
+			sensor_packet->voltage.bytes.high_byte = uart_get_byte(1, ROOMBA_UART);
+			sensor_packet->voltage.bytes.low_byte = uart_get_byte(2, ROOMBA_UART);
+			sensor_packet->current.bytes.high_byte = uart_get_byte(3, ROOMBA_UART);
+			sensor_packet->current.bytes.low_byte = uart_get_byte(4, ROOMBA_UART);
+			sensor_packet->temperature = uart_get_byte(5, ROOMBA_UART);
+			sensor_packet->charge.bytes.high_byte = uart_get_byte(6, ROOMBA_UART);
+			sensor_packet->charge.bytes.low_byte = uart_get_byte(7, ROOMBA_UART);
+			sensor_packet->capacity.bytes.high_byte = uart_get_byte(8, ROOMBA_UART);
+			sensor_packet->capacity.bytes.low_byte = uart_get_byte(9, ROOMBA_UART);
+		}
 		break;
 	}
 	uart_reset_receive(ROOMBA_UART);

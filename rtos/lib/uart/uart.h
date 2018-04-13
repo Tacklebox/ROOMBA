@@ -21,7 +21,7 @@ typedef enum _uart_bps
 	UART_DEFAULT,
 } UART_BPS;
 
-#define UART_BUFFER_SIZE    32
+#define UART_BUFFER_SIZE	32
 
 void uart_init(UART_BPS bitrate);
 void uart_putchar(uint8_t byte, int uart);
