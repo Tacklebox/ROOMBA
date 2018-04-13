@@ -11,27 +11,28 @@
 // a 16-bit integer split into its high and low bytes (AVR RAM is little-endian!)
 typedef struct _i16s
 {
-        uint8_t low_byte;
-        uint8_t high_byte;
+	uint8_t low_byte;
+	uint8_t high_byte;
 } int16_split;
 
 // a signed integer that can be manipulated as a single 16-bit value or as two concatenated bytes.
 typedef union _i16u
 {
-        int16_t value;
-        int16_split bytes;
+	int16_t value;
+	int16_split bytes;
 } int16_u;
 
 // an unsigned integer that can be manipulated as a single 16-bit value or as two concatenated bytes.
 typedef union _u16u
 {
-        uint16_t value;
-        int16_split bytes;
+	uint16_t value;
+	int16_split bytes;
 } uint16_u;
 
+/// The Roomba sensor data packet structure.  The total size should be 26 bytes.
 typedef struct
 {
-    // packet 1 (external sensors)
+	// packet 1 (external sensors)
     uint8_t  bumps_wheeldrops;
     uint8_t  wall;
     uint8_t  cliff_left;
@@ -56,6 +57,14 @@ typedef struct
     int8_t   temperature;
     uint16_u charge;
     uint16_u capacity;
+
+    // packet 106 (light bumpers)
+    uint16_u light_left;
+    uint16_u light_front_left;
+    uint16_u light_center_left;
+    uint16_u light_center_right;
+    uint16_u light_front_right;
+    uint16_u light_right;
 } roomba_sensor_data_t;
 
 #endif /* SENSOR_STRUCT_H_ */
