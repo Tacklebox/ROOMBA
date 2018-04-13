@@ -77,7 +77,10 @@ void Roomba_Init()
 	uart_putchar(CONTROL, ROOMBA_UART);
 	_delay_ms(20);
 
-	// Set the Roomba's LEDs to the defaults defined above (to verify defaults).
+	uart_putchar(SAFE, ROOMBA_UART);
+	_delay_ms(20);
+
+	// // Set the Roomba's LEDs to the defaults defined above (to verify defaults).
 	update_leds();
 }
 
@@ -185,6 +188,16 @@ void Roomba_Drive( int16_t velocity, int16_t radius )
 	uart_putchar(HIGH_BYTE(radius), ROOMBA_UART);
 	uart_putchar(LOW_BYTE(radius), ROOMBA_UART);
 }
+
+void Roomba_DriveDirect( int16_t rwheel, int16_t lwheel )
+{
+	uart_putchar(DIRECT, ROOMBA_UART);
+	uart_putchar(HIGH_BYTE(rwheel), ROOMBA_UART);
+	uart_putchar(LOW_BYTE(rwheel), ROOMBA_UART);
+	uart_putchar(HIGH_BYTE(lwheel), ROOMBA_UART);
+	uart_putchar(LOW_BYTE(lwheel), ROOMBA_UART);
+}
+
 
 /**
  * Update the LEDs on the Roomba to match the configured state

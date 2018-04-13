@@ -101,6 +101,9 @@ void Roomba_Drive( int16_t velocity, int16_t radius );
  * If the Roomba is in safe mode, then it puts itself in passive mode when its cliff sensors or wheeldrop sensors are triggered.
  * There's no way to obtain the Roomba's mode programmatically, but this function should not be affected by unexpected mode changes.
  */
+
+void Roomba_DriveDirect( int16_t rwheel, int16_t lwheel );
+
 void Roomba_ChangeState(ROOMBA_STATE newState);
 
 /**
