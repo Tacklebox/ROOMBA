@@ -18,50 +18,35 @@
 #define RIGHT_GATE 300
 #define IR_WINDOW_SIZE 5
 
-message controller_state = { 85, 0, 0, 0, 0, 0 };
+message controller_state = { 52, 0, 0, 0, 0, 0, 0 };
 
+int x_buffer[10];
+int y_buffer[10];
+int x_index = 0;
+int y_index = 0;
 
-/* void sample_joysticks() { */
-/*     char buffer[7]; */
-/*     sprintf(buffer, "%2d,%2d\n", x, y); */
-/*     int i; */
-/*         for(i = 0; i < strlen(buffer); i++) { */
-/*             UART_Transmit0(buffer[i]); */
-/*     } */
-/*     x = read_analog(JOYSTICK_1_X); */
-/*     y = read_analog(JOYSTICK_1_Y); */
-/* } */
+void sample_joysticks() {
+    x_buffer[x_index % 5] = read_analog(JOYSTICK_1_X);
+    y_buffer[y_index % 5] = read_analog(JOYSTICK_1_Y);
+    x_buffer[(x_index++ % 5) + 5] = read_analog(JOYSTICK_2_X);
+    y_buffer[(y_index++ % 5) + 5] = read_analog(JOYSTICK_2_Y);
+    controller_state.btn1 |= 
+}
 
-struct size_test {
-    char     magic:    6;
-    char     btn1:     1;
-    char     btn2:     1;
-    uint16_t x_pos_1: 10;
-    uint16_t y_pos_1: 10;
-    uint16_t x_pos_2: 10;
-    uint16_t y_pos_2: 10;
-} __attribute__((__packed__)) ;
+void send_state() {
+}
 
 int main() {
-    UART_Init0(19200);
-    for(;;){
-    UART_print0("%d\n", sizeof(struct size_test));
-    _delay_ms(3000);
-    }
-    /*
-    init_LED_D12();
     PORTB |= _BV(PORTB6);
     setup_controllers();
     UART_Init0(19200);
     UART_Init1(19200);
     _delay_ms(20);
-    //Roomba_ConfigPowerLED(128, 128);
     OS_Init();
-    // Task_Create_Period(joystick_task, 0, 20, 1, 2);
-    Task_Create_Period(roomba_sensor_task, 0, 100, 80, 0);
+    Task_Create_Period(sample_joysticks, 0, 30, 1, 2);
+    //Task_Create_Period(roomba_sensor_task, 0, 100, 80, 0);
     // Task_Create_Period(ir_sensor_task, 0, 50, 20, 5);
     // Task_Create_Period(swap_modes, 0, 6000, 1, 0);
     OS_Start();
-    */
     return 1;
 }
