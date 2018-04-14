@@ -12,28 +12,25 @@
 #include "sensor_struct.h"
 #include "../os/os.h"
 
-#define LOW_BYTE(v)   ((unsigned char) (v))
-#define HIGH_BYTE(v)  ((unsigned char) (((unsigned int) (v)) >> 8))
+// #define LOW_BYTE(v)   ((unsigned char) (v))
+// #define HIGH_BYTE(v)  ((unsigned char) (((unsigned int) (v)) >> 8))
 
 #define DD_DDR DDRC
 #define DD_PORT PORTC
 #define DD_PIN PC5
-#define ROOMBA_UART 1
-#define BT_UART 2
-#define TIMEOUT_MS 50
+
 
 ROOMBA_STATE state = SAFE_MODE;
 
 void Roomba_Init()
 {
-	ROOMBA_DD_DDR |= 1<<ROOMBA_DD_PIN;
-	ROOMBA_DD_PORT &= ~(1<<ROOMBA_DD_PIN);
-
-	// At 8 MHz, the AT90 generates a 57600 bps signal with a framing error rate of over 2%, which means that more than
-	// 1 out of every 50 bits is wrong.  The fastest bitrate with a low error rate that the Roomba supports is
-	// 38400 bps (0.2% error rate, or 1 bit out of every 500).
-
-	// Try 57.6 kbps to start (this is the Roomba's default baud rate after the battery is installed).
+	uint8_t i;
+	DD_DDR |= _BV(DD_PIN);
+	// Wake up the Roomba by driving the DD pin low for 500 ms.
+	DD_PORT &= ~_BV(DD_PIN);
+	_delay_ms(500);
+	DD_PORT |= _BV(DD_PIN);
+	
 	Roomba_UART_Init(UART_115200);
 
 	// Try to start the SCI
@@ -163,6 +160,16 @@ void Roomba_Drive( int16_t velocity, int16_t radius )
 	Roomba_Send_Byte(HIGH_BYTE(radius));
 	Roomba_Send_Byte(LOW_BYTE(radius));
 }
+
+void Roomba_DriveDirect( int16_t rwheel, int16_t lwheel )
+{
+	Roomba_Send_Byte(DIRECT);
+	Roomba_Send_Byte(HIGH_BYTE(rwheel));
+	Roomba_Send_Byte(LOW_BYTE(rwheel));
+	Roomba_Send_Byte(HIGH_BYTE(lwheel));
+	Roomba_Send_Byte(LOW_BYTE(lwheel));
+}
+
 
 // Set the Roomba's main LED color,intensity and stuff
 void Roomba_LED(int8_t led_bits,int8_t color, int8_t intensity)
