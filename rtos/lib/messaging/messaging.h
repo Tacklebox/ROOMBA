@@ -2,15 +2,16 @@
 
 typedef union message_type {
     struct {
-        char magic: 7;
-        char btn:   1;
-        uint16_t x_pos_1;
-        uint16_t y_pos_1;
-        uint16_t x_pos_2;
-        uint16_t y_pos_2;
+        char     magic:    6;
+        char     btn1:     1;
+        char     btn2:     1;
+        uint16_t x_pos_1: 10;
+        uint16_t y_pos_1: 10;
+        uint16_t x_pos_2: 10;
+        uint16_t y_pos_2: 10;
     } __attribute__((__packed__)) ;
-    char bytes[9];
+    char bytes[6];
 } message;
 
-message recv_message_bt();
-void send_message_bt(message m);
+void recv_message_bt(message*);
+void send_message_bt(message);
