@@ -99,9 +99,6 @@ uint8_t wait_for_bytes(int uart, uint8_t num_bytes, uint8_t timeout)
 	start = Now();	// current system time
 	while (((Now() - start) < timeout) && uart_bytes_received(uart) < num_bytes){
 		uint8_t test = uart_bytes_received(uart);
-		char buffer[10];
-		sprintf(buffer, "b:%d\n", test);
-    	uart_send_string(buffer, 0);
 	}
 	if (uart_bytes_received(uart) >= num_bytes)
 		return 1;
@@ -130,12 +127,7 @@ void Roomba_UpdateSensorPacket(ROOMBA_SENSOR_GROUP group, roomba_sensor_data_t* 
 			sensor_packet->motor_overcurrents = uart_get_byte(7, ROOMBA_UART);
 			sensor_packet->dirt_left = uart_get_byte(8, ROOMBA_UART);
 			sensor_packet->dirt_right = uart_get_byte(9, ROOMBA_UART);
-		}else{
-			char buffer[10];
-		    sprintf(buffer, "fail\n");
-    		uart_send_string(buffer, 0);
 		}
-
 		break;
 	case CHASSIS:
 		// chassis sensors
