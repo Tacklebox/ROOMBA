@@ -7,16 +7,12 @@
 #include <string.h>
 
 #define LED_BLINK_DURATION 500
-#define MOVE_SPEED 300
-#define ROTATE_SPEED 300
 #define JOYSTICK_1_X 1
 #define JOYSTICK_1_Y 0
-#define IR_SENSOR 7
-#define FORWARD_GATE 800
-#define BACKWARD_GATE 300
-#define LEFT_GATE 800
-#define RIGHT_GATE 300
-#define IR_WINDOW_SIZE 5
+#define JOYSTICK_2_X 2
+#define JOYSTICK_2_Y 3
+#define JOYSTICK_1_B PORTB0;
+#define JOYSTICK_2_B PORTB1;
 
 message controller_state = { 52, 0, 0, 0, 0, 0, 0 };
 
@@ -30,10 +26,23 @@ void sample_joysticks() {
     y_buffer[y_index % 5] = read_analog(JOYSTICK_1_Y);
     x_buffer[(x_index++ % 5) + 5] = read_analog(JOYSTICK_2_X);
     y_buffer[(y_index++ % 5) + 5] = read_analog(JOYSTICK_2_Y);
-    controller_state.btn1 |= 
+    controller_state.btn1 |= (PORTB & PORTB0) ;
+    controller_state.btn2 |= (PORTB & PORTB1);
 }
 
 void send_state() {
+    int x = 0, y = 0;
+    for(int i=0; i < 5; i++) {
+        controller_state.x_pos_1 += x_buffer[i];
+        controller_state.x_pos_2 += x_buffer[i+5];
+        controller_state.y_pos_1 += y_buffer[i];
+        controller_state.y_pos_2 += y_buffer[i+5];
+    }
+    controller_state.x_pos_1 /= 5;
+    controller_state.x_pos_2 /= 5;
+    controller_state.y_pos_1 /= 5;
+    controller_state.y_pos_2 /= 5;
+    send_message(controller_state);
 }
 
 int main() {
@@ -41,12 +50,9 @@ int main() {
     setup_controllers();
     UART_Init0(19200);
     UART_Init1(19200);
-    _delay_ms(20);
     OS_Init();
-    Task_Create_Period(sample_joysticks, 0, 30, 1, 2);
-    //Task_Create_Period(roomba_sensor_task, 0, 100, 80, 0);
-    // Task_Create_Period(ir_sensor_task, 0, 50, 20, 5);
-    // Task_Create_Period(swap_modes, 0, 6000, 1, 0);
+    Task_Create_Period(sample_joysticks, 0, 30, 1, 0);
+    Task_Create_Period(send_state, 0, 150, 5, 160);
     OS_Start();
     return 1;
 }
