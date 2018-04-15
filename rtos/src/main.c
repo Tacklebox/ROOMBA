@@ -12,12 +12,13 @@
 #define ROTATE_SPEED 300
 #define JOYSTICK_1_X 1
 #define JOYSTICK_1_Y 0
-#define IR_SENSOR 7
+#define IR_SENSOR 0 
 #define FORWARD_GATE 800
 #define BACKWARD_GATE 300
 #define LEFT_GATE 800
 #define RIGHT_GATE 300
-#define IR_WINDOW_SIZE 5
+#define IR_WINDOW_SIZE 5 
+#define IR_GATE 10 
 
 typedef enum mode_type {
     CRUISE = 1,
@@ -102,7 +103,17 @@ void backup(){
     Roomba_Drive(-1 * MOVE_SPEED, 0);
     _delay_ms(500);
     Roomba_Drive(0, 0);
-    Task_Next();
+    Task_Terminate();
+}
+
+void forward() {
+    char buffer[10];
+    for(;;){
+        sprintf(buffer, "BEEP BEEP\n");
+        uart_send_string(buffer, 0);
+        Roomba_Drive(0.25*MOVE_SPEED, 0);
+        Task_Next();
+    }    
 }
 
 void process_roomba_sensor_data() {
@@ -126,16 +137,24 @@ void roomba_sensor_task(){
 void die(){
     char buffer[10];
     Roomba_ConfigPowerLED(0, 255);
+    Roomba_Drive(0, 0);
     sprintf(buffer, "die\n");
-    uart_send_string(buffer, 0);
-    for(;;){};
+    //uart_send_string(buffer, 0);
+    while(1);
 }
 
 void process_ir_sensor(){
     char buffer[10];
-    sprintf(buffer, "%d\n", cur_ir - avg_ir);
+    uint16_t delta = 0;
+    if(cur_ir > avg_ir){
+        delta = cur_ir - avg_ir;
+    }else{
+        delta = avg_ir - cur_ir;
+    }
+
+    sprintf(buffer, "ir %d,%d\n", avg_ir, cur_ir);
     uart_send_string(buffer, 0);
-    if((cur_ir - avg_ir) > IR_WINDOW_SIZE){
+    if(delta > IR_GATE){
         sprintf(buffer, "addie\n");
         uart_send_string(buffer, 0);
         Task_Create_System(die, 0);
@@ -190,9 +209,9 @@ int main() {
     Roomba_ConfigPowerLED(128, 128);
     OS_Init();
     // Task_Create_Period(joystick_task, 0, 20, 1, 2);
+    Task_Create_RR(forward, 0);
     Task_Create_RR(roomba_sensor_task, 0);
-    Task_Create_RR(roomba_sensor_task, 0);
-    // Task_Create_Period(ir_sensor_task, 0, 50, 20, 5);
+    Task_Create_RR(ir_sensor_task, 0);
     // Task_Create_Period(swap_modes, 0, 6000, 1, 0);
     OS_Start();
     return 1;

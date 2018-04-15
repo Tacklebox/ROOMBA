@@ -20,7 +20,7 @@ void setup_controllers()
     */
 	
 	/* Configure PORTC to received digital inputs for bits 0 to 3 */
-	DDRC = (DDRC & 0xF0);
+	DDRC = (DDRC & 0xFF);
 	
 	/* Configure Analog Inputs using ADC */
     ADCSRA |= (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0); // Set ADC prescalar to 128 - 125KHz sample rate @ 16MHz
