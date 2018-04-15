@@ -7,6 +7,7 @@
 #include <avr/interrupt.h>
 #include <util/delay.h>
 
+#define LED_BLINK_DURATION 500
 #define MAXMESSAGES 20
 
 typedef enum task_priority_type { HIGHEST = 0, MEDIUM, LOWEST, IDLE } task_priority;
@@ -79,6 +80,8 @@ static queue_t high_queue;
 static queue_t low_queue;
 
 static task idle_task;
+
+static queue_t ipc_queue;
 
 volatile static task *cur_task;
 volatile static unsigned int num_tasks;
@@ -280,6 +283,7 @@ static void Next_Kernel_Request() {
     Dispatch(); /* select a new task to run */
 
     while (1) {
+        PORTB ^= _BV(PORTB6);
         cur_task->request = NONE; /* clear its request */
         cur_task->state = RUNNING;
 
@@ -403,19 +407,7 @@ void Reset_Messages() {
     }
 }
 
-void enable_TIMER4() {
-    TCCR4A = 0;
-    TCCR4B = 0;
-    TCCR4B |= _BV(WGM42);
-    TCCR4B |= _BV(CS40);
-    TCCR4B |= _BV(CS41);
-    OCR4A = 250 * MSECPERTICK;
-    TIMSK4 |= _BV(OCIE4A);
-    TCNT4 = 0;
-}
-
 void OS_Init() {
-    enable_TIMER4();
     int x;
     num_tasks = 0;
     kernel_active = 0;
@@ -430,8 +422,20 @@ void OS_Init() {
     }
 }
 
+void enable_TIMER4() {
+    TCCR4A = 0;
+    TCCR4B = 0;
+    TCCR4B |= _BV(WGM42);
+    TCCR4B |= _BV(CS40);
+    TCCR4B |= _BV(CS41);
+    OCR4A = 250 * MSECPERTICK;
+    TIMSK4 |= _BV(OCIE4A);
+    TCNT4 = 0;
+}
+
 void OS_Start() {
     ticks = 0;
+    enable_TIMER4();
     if (!kernel_active) {
         Disable_Interrupt();
         /* we may have to initialize the interrupt vector for Enter_Kernel() here.
@@ -442,8 +446,8 @@ void OS_Start() {
         /* NEVER RETURNS!!! */
     }
 }
- 
-unsigned int Now() { return ((ticks * MSECPERTICK) + (TCNT4 / 250)); }
+
+unsigned int Now() { return ticks * MSECPERTICK; }
 
 /*
  * IPC Section begin
@@ -499,13 +503,10 @@ void Msg_ASend(PID id, MTYPE t, unsigned int v) {
     cur_task->request = SEND;
     Enter_Kernel();
 }
-/*
- * IPC Section end
- */
-
 
 ISR(TIMER4_COMPA_vect) {
     ticks++;
     cur_task->request = NEXT;
     Enter_Kernel();
 }
+

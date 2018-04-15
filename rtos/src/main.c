@@ -96,16 +96,23 @@ void sample_roomba_sensor_data() {
 }
 
 void backup(){
+    char buffer[10];
+    sprintf(buffer, "BEEP BEEP\n");
+    uart_send_string(buffer, 0);
     Roomba_Drive(-1 * MOVE_SPEED, 0);
     _delay_ms(500);
     Roomba_Drive(0, 0);
+    Task_Create_RR(backup, 0);    
+    Task_Next();
 }
 
 void process_roomba_sensor_data() {
     char buffer[10];
-    if(roomba_data.virtual_wall || roomba_data.wall || roomba_data.bumps_wheeldrops > 0){
+    if(roomba_data.virtual_wall || roomba_data.wall || roomba_data.bumps_wheeldrops){
         sprintf(buffer, "back\n");
+        uart_send_string(buffer, 0);
         Task_Create_System(backup, 0);
+        Task_Next();
     }
 }
 
@@ -184,7 +191,8 @@ int main() {
     Roomba_ConfigPowerLED(128, 128);
     OS_Init();
     // Task_Create_Period(joystick_task, 0, 20, 1, 2);
-    Task_Create_Period(roomba_sensor_task, 0, 50, 20, 0);
+    /* Task_Create_RR(roomba_sensor_task, 0); */
+    Task_Create_RR(backup, 0);
     // Task_Create_Period(ir_sensor_task, 0, 50, 20, 5);
     // Task_Create_Period(swap_modes, 0, 6000, 1, 0);
     OS_Start();
